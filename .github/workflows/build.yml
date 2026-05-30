@@ -19,17 +19,6 @@ on:
         value: ${{ jobs.build.outputs.build-num }}
       tag:
         value: ${{ jobs.build.outputs.tag }}
-  pull_request:
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - '!.github/workflows/build.yml'
-  push:
-    branches: [main, next]
-    paths-ignore:
-      - '**.md'
-      - '.github/**'
-      - '!.github/workflows/build.yml'
   workflow_dispatch:
 
 concurrency:
