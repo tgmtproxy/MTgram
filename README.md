@@ -2,9 +2,11 @@
 
 Форк Telegram для Android. Патчи против DPI-блокировок и несколько UI-фиксов.
 
-[![Channel](https://img.shields.io/badge/Канал-Telegram-blue.svg)](https://t.me/MTgramApp)
-[![Chat](https://img.shields.io/badge/Чат-Telegram-blue.svg)](https://t.me/MTgramChat)
-[![Download](https://img.shields.io/badge/Скачать-Releases-green.svg)](https://github.com/tgmtproxy/MTgram/releases)
+<p align="center">
+  <a href="https://t.me/MTgramApp"><img src="https://img.shields.io/badge/Канал-MTgramApp-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" /></a>
+  <a href="https://t.me/MTgramChat"><img src="https://img.shields.io/badge/Чат-MTgramChat-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" /></a>
+  <a href="https://github.com/tgmtproxy/MTgram/releases"><img src="https://img.shields.io/github/v/release/tgmtproxy/MTgram?style=for-the-badge&label=Скачать&color=3aa040&logo=android&logoColor=white" /></a>
+</p>
 
 Код открытый, можно проверить самому. Никаких посторонних серверов, никакого сбора данных — всё соединение идёт напрямую через серверы Telegram, как в оригинале.
 
