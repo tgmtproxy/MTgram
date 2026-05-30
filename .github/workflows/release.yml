@@ -3,7 +3,7 @@ name: release
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
       - '**.md'
       - '.github/**'
@@ -120,10 +120,16 @@ jobs:
         run: |
           tag='${{ needs.build.outputs.tag }}'
           apk='${{ needs.build.outputs.apk-name }}'
+          PRERELEASE=""
+          if [ "$GITHUB_REF_NAME" = "dev" ]; then
+            PRERELEASE="--prerelease"
+            tag="${tag}-dev"
+          fi
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
             --title "$tag" \
             --generate-notes \
+            $PRERELEASE \
             "out/$apk"
 
       - name: upload to telegram

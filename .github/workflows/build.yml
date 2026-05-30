@@ -86,6 +86,20 @@ jobs:
           verbose: 2
           save: ${{ github.event_name != 'pull_request' }}
 
+      - name: write API_KEYS
+        env:
+          APP_ID: ${{ secrets.TELEGRAM_API_ID }}
+          APP_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          cat > API_KEYS <<EOF
+          APP_ID = $APP_ID
+          APP_HASH = $APP_HASH
+          MAPS_V2_API = placeholder
+          SIGNING_KEY_PASSWORD = ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS = mtgram
+          SIGNING_KEY_STORE_PASSWORD = ${{ secrets.KEYSTORE_PASSWORD }}
+          EOF
+
       - name: set up worktree
         run: pnpm run setup -- --no-stgit
 
