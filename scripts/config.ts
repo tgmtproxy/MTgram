@@ -22,12 +22,12 @@ export const forkSyncFiles: ForkSyncFile[] = [
   // code
   {
     source: 'src/kotlin',
-    target: 'TMessagesProj/src/main/kotlin/desu/inugram',
+    target: 'TMessagesProj/src/main/kotlin/desu/MTgram',
     directory: true,
   },
   {
     source: 'src/kotlin-app',
-    target: 'TMessagesProj_App/src/main/kotlin/desu/inugram',
+    target: 'TMessagesProj_App/src/main/kotlin/desu/MTgram',
     directory: true,
   },
   {

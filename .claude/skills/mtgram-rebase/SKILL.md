@@ -1,7 +1,7 @@
 ---
-name: inugram-rebase
+name: MTgram-rebase
 description: >
-  Use when rebasing the inugram stgit patchset onto newer upstream Telegram and
+  Use when rebasing the MTgram stgit patchset onto newer upstream Telegram and
   resolving the conflicts it produces. Trigger whenever `pnpm run rebase
   latest`/`<ref>` reports merge conflicts, when worktree files show `<<<<<<<
   current` / `>>>>>>> patched` markers, or the user says "rebase the patchset",
@@ -11,14 +11,14 @@ description: >
   `patched` (the fork's recorded delta), the recurring conflict shapes and their
   fixes, dispatching a subagent for big multi-file refactors, and logging
   questionable resolutions to `TODO.md`. NOT for creating or editing a single
-  patch (that's the inugram-patches skill), and NOT for ordinary git merge
+  patch (that's the MTgram-patches skill), and NOT for ordinary git merge
   conflicts unrelated to the stgit stack.
 ---
 
-# Inugram rebase guide
+# MTgram rebase guide
 
 Rebasing = replaying the whole stgit stack onto a newer stock Telegram. Read the
-`inugram-patches` skill + `CLAUDE.md` first — this covers only the rebase loop.
+`MTgram-patches` skill + `CLAUDE.md` first — this covers only the rebase loop.
 
 `pnpm run rebase latest` (or `pnpm run rebase <sha>`) fetches upstream and
 rebases the stack, stopping at the first conflicting patch. The rebase target
@@ -28,7 +28,7 @@ sha is printed (`Rebasing to <sha> (upstream/master)`) — **note it**; you'll
 ## Authorization
 
 Rebasing IS the task, so running `git add`, `stg refresh`, `stg push -a` is
-expected here — this skill is the explicit exception to inugram-patches' "never
+expected here — this skill is the explicit exception to MTgram-patches' "never
 run stg/git". **Still never `stg export` / `pnpm run export`** (the user does
 that at the very end). Don't start `pnpm run rebase` yourself unless asked; the
 user usually kicks it off.

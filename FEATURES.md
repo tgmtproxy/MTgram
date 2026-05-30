@@ -1,11 +1,11 @@
-# Inugram features
+# MTgram features
 
 > non-exhaustive list of what this fork adds, tweaks or fixes vs stock telegram android.
 > keep this updated as patches are added/removed.
 
-most things are toggleable in `Settings → Inugram`, with sensible opinionated defaults.
+most things are toggleable in `Settings → MTgram`, with sensible opinionated defaults.
 
-🐶 - Inugram-exclusive (as far as i know, as of writing)
+🐶 - MTgram-exclusive (as far as i know, as of writing)
 
 ## appearance & general
 
@@ -13,7 +13,7 @@ most things are toggleable in `Settings → Inugram`, with sensible opinionated 
 - monet (material you) theme support - *ported from [NagramX](https://github.com/risin42/NagramX)*, plus a quick switcher in appearance settings (light/dark/amoled/auto)
 - 🐶 non-island ui mode for tab bars, global search and chat elements
 - icon replacement (currently: solar pack, [480 Design](https://t.me/Design480)) - *ported from [NagramX](https://github.com/risin42/NagramX)*
-- notification icon: Telegram (default) or Inugram
+- notification icon: Telegram (default) or MTgram
 - show seconds in timestamps
 - 🐶 customizable animation speed multiplier (incl. instant)
 - show peer id in profile (telegram id / bot api id)
@@ -148,7 +148,7 @@ most things are toggleable in `Settings → Inugram`, with sensible opinionated 
 - per-account passcodes, hidden accounts, panic code, hidden settings deeplink - *ported from [Nekogram](https://github.com/Nekogram/Nekogram)*
 - 🐶 paranoia mode: pick chats to hide everywhere; all secret chats hidden too; exit by typing a custom code in chat search
   - optional whitelist mode: hide everything *except* the picked chats (service notifications stay visible)
-  - optionally hide the Inugram settings entirely when enabled
+  - optionally hide the MTgram settings entirely when enabled
   - optionally disguise as stock Telegram when enabled
   - optionally silence all notifications while enabled
   - optionally hide all other accounts while enabled

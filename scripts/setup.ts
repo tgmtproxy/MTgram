@@ -21,7 +21,7 @@ import {
 } from './lib.js'
 import { svgBodyToVectorDrawable } from './svg-to-vector.js'
 
-const BRANCH = 'inugram'
+const BRANCH = 'MTgram'
 
 function sameOrder(actual: string[], expected: string[]) {
   return actual.length === expected.length && actual.every((value, index) => value === expected[index])

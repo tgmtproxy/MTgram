@@ -1,6 +1,6 @@
-# Inugram Agent Guide
+# MTgram Agent Guide
 
-Inugram is a **patchset**, not a fork. `worktree/` is a stock Telegram checkout with
+MTgram is a **patchset**, not a fork. `worktree/` is a stock Telegram checkout with
 stgit patches applied on top. Fork code lives in `src/kotlin`/`src/res` (symlinked
 into the worktree). `patches/` and `series` are export targets, not source of truth.
 
@@ -16,7 +16,7 @@ the same change.
 4. **Default off = stock-identical.** Every behavior change gated behind an `InuConfig.*.getValue()` check. Verify every call site is gated.
 5. **Check if stock already does it** before implementing a toggle (e.g. Lite Mode often has it). Tell the user, don't silently re-implement.
 6. **Confirm bug repro in unpatched worktree** before treating a visual/behavior issue as a patch regression.
-7. **No renames in stock. No removing stock imports** (except `desu.inugram.*`).
+7. **No renames in stock. No removing stock imports** (except `desu.MTgram.*`).
 8. **Prefer data-layer patches over UI-layer** — one hook in a controller beats fifteen hooks in views.
 9. **Never touch `TLRPC.java`** — auto-generated, rebasing changes there is hell.
 10. **Never touch stock DB schema or `LAST_DB_VERSION`** — fork state goes in `inu_*` tables / `inu_kv` via `InuDatabaseHelper`.
@@ -46,7 +46,7 @@ Propose a patch name for every newly made patch — don't touch stgit yourself.
 
 ```java
 public void doSomething() {
-    if (desu.inugram.InuConfig.MY_TOGGLE.getValue()) {
+    if (desu.MTgram.InuConfig.MY_TOGGLE.getValue()) {
         MyHelper.handle(this);
         return;
     }
@@ -137,7 +137,7 @@ Standalone hook patches expose surfaces (menu builders, callbacks, `public` fiel
 - **Rule of 3**: if 3+ existing patches touch roughly the same stock surface, consolidate.
 - A `hooks/` patch must be functionally a no-op with its consumers stubbed out.
 
-Conventions: expose the minimum, promote `private` → `public` over duplicating data, `inu_` prefix on new fields, entry point is always a call to `desu.inugram.helpers.XxxHelper.*` — never inline logic.
+Conventions: expose the minimum, promote `private` → `public` over duplicating data, `inu_` prefix on new fields, entry point is always a call to `desu.MTgram.helpers.XxxHelper.*` — never inline logic.
 
 ## Helpers
 
@@ -183,7 +183,7 @@ New hook → `@JvmStatic fun` on `InuHooks`, one-line call site in the patch, **
 - Types: `BoolItem`, `IntItem`, `FloatItem`, `StringItem`. Subclass `Item<T>` for anything else (enums — see `FoldersDisplayModeItem`, `FormattingPopupConfig`).
 - `BoolItem` has `.toggle()`.
 - From Java: `InuConfig.HIDE_STORIES.getValue()` — **never `.value`** (`@JvmField` exposes the wrapper, not its inner value).
-- Pref key = snake_case of the field name; default is the second arg. SharedPreferences name: `inugram`. Loaded once from `InuHooks.init`.
+- Pref key = snake_case of the field name; default is the second arg. SharedPreferences name: `MTgram`. Loaded once from `InuHooks.init`.
 
 ## Database
 
@@ -194,7 +194,7 @@ New hook → `@JvmStatic fun` on `InuHooks`, one-line call site in the patch, **
 
 ## Settings UI
 
-- Extend `desu.inugram.ui.settings.SettingsPageActivity` (wraps `UniversalFragment` with edge-to-edge + insets + `showRestartBulletin()`). Register pages in `InuSettingsActivity`.
+- Extend `desu.MTgram.ui.settings.SettingsPageActivity` (wraps `UniversalFragment` with edge-to-edge + insets + `showRestartBulletin()`). Register pages in `InuSettingsActivity`.
 - Prefer adding to an existing page:
   - `AppearanceSettingsActivity` — general appearance
   - `ChatsSettingsActivity` — chat-related appearance (bubbles, menus)
@@ -207,7 +207,7 @@ New hook → `@JvmStatic fun` on `InuHooks`, one-line call site in the patch, **
 
 ### Settings search & deeplinks
 
-- `desu.inugram.SearchRegistry` wires fork pages into stock settings search (`ProfileActivity.SearchAdapter`) and routes `tg://settings/inu/<slug>` deeplinks.
+- `desu.MTgram.SearchRegistry` wires fork pages into stock settings search (`ProfileActivity.SearchAdapter`) and routes `tg://settings/inu/<slug>` deeplinks.
 - Each searchable `*SettingsActivity` declares a `@JvmField val PAGE = SearchRegistry.Page(...)` in its companion: page `slug`, title res, icon res, factory, list of `SearchRegistry.Entry(slug, titleRes, itemId)` — one per searchable `UItem`. `itemId` reuses the page's `InuUtils.generateId()` constant (also used as the `UItem.id`).
 - Register in `SearchRegistry.pages`. Slugs are persistent identity (deeplinks + recents), globally unique — uniqueness asserted at first access. Renaming a slug is a breaking change.
 - Row highlight on open: `SettingsPageActivity.withHighlight(itemId)` + existing `onTransitionAnimationEnd` hook. No extra wiring per page.

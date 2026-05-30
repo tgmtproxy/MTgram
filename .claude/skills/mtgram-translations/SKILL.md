@@ -1,14 +1,14 @@
 ---
-name: inugram-translations
+name: MTgram-translations
 description: >
-  Use when syncing, actualizing, auditing, or adding inugram translations — the
+  Use when syncing, actualizing, auditing, or adding MTgram translations — the
   per-locale `src/res/values-<iso>/strings_inu.xml` files against the base
   `src/res/values/strings_inu.xml`. Trigger on requests to "update translations",
   "sync translations", "find missing strings", "translate to X", or to add a new
   locale.
 ---
 
-# Inugram translations
+# MTgram translations
 
 Base strings: `src/res/values/strings_inu.xml`. Each locale is a sibling
 `src/res/values-<iso>/strings_inu.xml`. Every locale must be registered in
