@@ -92,7 +92,7 @@ jobs:
       - name: compute build info
         id: info
         env:
-          INU_BUILD: ${{ vars.INU_BUILD || '1' }}
+          MTG_BUILD: ${{ vars.MTG_BUILD || '1' }}
         run: pnpm tsx scripts/ci/version.ts
 
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
@@ -119,8 +119,8 @@ jobs:
         working-directory: worktree
         env:
           COMMIT_ID: ${{ github.sha }}
-          INU_BUILD: ${{ steps.info.outputs.build-num }}
-          INU_BUILD_TYPE: release
+          MTG_BUILD: ${{ steps.info.outputs.build-num }}
+          MTG_BUILD_TYPE: release
           CCACHE_COMPILERCHECK: content
           CCACHE_SLOPPINESS: time_macros,file_macro,include_file_mtime,include_file_ctime,locale,system_headers
           CCACHE_BASEDIR: ${{ github.workspace }}/worktree
