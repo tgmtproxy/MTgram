@@ -1,3 +1,4 @@
+feature/tls-fingerprint.patch
 bugfix/photo-viewer-crop.patch
 misc/build-support.patch
 misc/branding.patch

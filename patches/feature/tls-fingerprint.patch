@@ -1,0 +1,256 @@
+--- a/TMessagesProj/jni/tgnet/ConnectionSocket.cpp
++++ b/TMessagesProj/jni/tgnet/ConnectionSocket.cpp
+@@ -253,7 +253,7 @@
+ 
+     static const TlsHello &getDefault() {
+         static TlsHello result = [] {
+-            TlsHello res;
++            TlsHello res; // Chrome 131 Windows profile
+             res.ops = {
+                     Op::string("\x16\x03\x01", 3),
+                     Op::begin_scope(),
+@@ -263,43 +263,57 @@
+                     Op::zero(32),
+                     Op::string("\x20", 1),
+                     Op::random(32),
++                    // Cipher suites: GREASE + Chrome 131 list (17 suites = 0x0022 bytes).
++                    // Order: AES-128, AES-256, ChaCha20 (Chrome ordering, not Firefox).
+                     Op::string("\x00\x20", 2),
+                     Op::grease(0),
+                     Op::string("\x13\x01\x13\x02\x13\x03\xc0\x2b\xc0\x2f\xc0\x2c\xc0\x30\xcc\xa9\xcc\xa8\xc0\x13\xc0\x14\x00\x9c\x00\x9d\x00\x2f\x00\x35\x01\x00", 32),
+                     Op::begin_scope(),
+-                    Op::grease(2),
++                    // Chrome 131: GREASE extension is always first (RFC 8701 §3.1).
++                    Op::grease(2), Op::string("\x00\x00", 2),
++                    // SNI is always second in Chrome (fixed position after GREASE).
+                     Op::string("\x00\x00", 2),
++                    Op::begin_scope(),
++                    Op::begin_scope(),
++                    Op::string("\x00", 1),
++                    Op::begin_scope(),
++                    Op::domain(),
++                    Op::end_scope(),
++                    Op::end_scope(),
++                    Op::end_scope(),
++                    // Remaining extensions are permuted.
+                     Op::permutation({
+-                        {
+-                            Op::string("\x00\x00", 2),
+-                            Op::begin_scope(),
+-                            Op::begin_scope(),
+-                            Op::string("\x00", 1),
+-                            Op::begin_scope(),
+-                            Op::domain(),
+-                            Op::end_scope(),
+-                            Op::end_scope(),
+-                            Op::end_scope()
+-                        },
+-                        { Op::string("\x00\x05\x00\x05\x01\x00\x00\x00\x00",9) },
++                        // status_request / OCSP stapling (0x0005)
++                        { Op::string("\x00\x05\x00\x05\x01\x00\x00\x00\x00", 9) },
++                        // supported_groups (0x000a): GREASE, X25519MLKEM768, x25519, P-256, P-384
+                         {
+                             Op::string("\x00\x0a\x00\x0c\x00\x0a", 6),
+                             Op::grease(4),
+                             Op::string("\x11\xec\x00\x1d\x00\x17\x00\x18", 8)
+                         },
++                        // ec_point_formats (0x000b)
+                         { Op::string("\x00\x0b\x00\x02\x01\x00", 6) },
+-                        { Op::string("\x00\x0d\x00\x12\x00\x10\x04\x03\x08\x04\x04\x01\x05\x03\x08\x05\x05\x01\x08\x06\x06\x01",22) },
++                        // signature_algorithms (0x000d) — Chrome 131: 8 schemes
++                        { Op::string("\x00\x0d\x00\x12\x00\x10\x04\x03\x08\x04\x04\x01\x05\x03\x08\x05\x05\x01\x08\x06\x06\x01", 22) },
++                        // ALPN (0x0010): h2, http/1.1
+                         { Op::string("\x00\x10\x00\x0e\x00\x0c\x02\x68\x32\x08\x68\x74\x74\x70\x2f\x31\x2e\x31", 18) },
++                        // signed_certificate_timestamp / SCT (0x0012) — Chrome only
+                         { Op::string("\x00\x12\x00\x00", 4) },
++                        // extended_master_secret (0x0017)
+                         { Op::string("\x00\x17\x00\x00", 4) },
++                        // compress_certificate (0x001b): brotli — Chrome only
+                         { Op::string("\x00\x1b\x00\x03\x02\x00\x02", 7) },
++                        // session_ticket (0x0023, empty)
+                         { Op::string("\x00\x23\x00\x00", 4) },
++                        // supported_versions (0x002b): GREASE, TLS 1.3, TLS 1.2
+                         {
+                             Op::string("\x00\x2b\x00\x07\x06", 5),
+                             Op::grease(6),
+                             Op::string("\x03\x04\x03\x03", 4)
+                         },
++                        // psk_key_exchange_modes (0x002d): psk_dhe_ke
+                         { Op::string("\x00\x2d\x00\x02\x01\x01", 6) },
++                        // key_share (0x0033): GREASE + X25519MLKEM768 (ML-KEM-768) + x25519
+                         {
+                             Op::string("\x00\x33\x04\xef\x04\xed", 6),
+                             Op::grease(4),
+@@ -309,7 +323,10 @@
+                             Op::string("\x00\x1d\x00\x20", 4),
+                             Op::K(),
+                         },
++                        // application_layer_protocol_settings / ALPS new (0x44cd) — Chrome only
+                         { Op::string("\x44\xcd\x00\x05\x00\x03\x02\x68\x32", 9) },
++                        // encrypted_client_hello / ECH draft (0xfe0d) — Chrome 131+
++                        // 0xfe0d replaces the old detectable 0xfe02 value.
+                         {
+                             Op::string("\xfe\x0d", 2),
+                             Op::begin_scope(),
+@@ -322,10 +339,11 @@
+                             Op::end_scope(),
+                             Op::end_scope()
+                         },
++                        // renegotiation_info (0xff01, empty RI)
+                         { Op::string("\xff\x01\x00\x01\x00", 5) }
+                     }),
+-                    Op::grease(3),
+-                    Op::string("\x00\x01\x00", 3),
++                    // Padding (0x0015) — Chrome appends padding to reach ~512 bytes.
++                    Op::grease(3), Op::string("\x00\x01\x00", 3),
+                     Op::P(),
+                     Op::end_scope(),
+                     Op::end_scope(),
+@@ -336,6 +354,106 @@
+         return result;
+     }
+ 
++    // Firefox 120 TLS 1.3 ClientHello profile.
++    //
++    // Key fingerprint differences vs Chrome (getDefault):
++    //   - Cipher order: 1303 (ChaCha) before 1302 (AES-256); cca9/cca8 before c02c/c030
++    //   - No GREASE entry in cipher list (Firefox omits it)
++    //   - key_share: x25519 only — no ML-KEM / Kyber
++    //   - supported_groups: no GREASE injection
++    //   - supported_versions: no GREASE; TLS 1.3 + 1.2 only
++    //   - No ALPS (0x44cd) and no ECH (0xfe0d) extensions
++    //   - record_size_limit (0x001c) instead of compress_certificate (0x001b)
++    //   - No SCT (0x0012)
++    //   - SNI is always first (fixed); remaining extensions are permuted
++    static TlsHello getFirefox() {
++        TlsHello res; // Not static — Firefox profile is constructed per-connection.
++        res.ops = {
++                Op::string("\x16\x03\x01", 3),
++                Op::begin_scope(),
++                Op::string("\x01\x00", 2),
++                Op::begin_scope(),
++                Op::string("\x03\x03", 2),
++                Op::zero(32),
++                Op::string("\x20", 1),
++                Op::random(32),
++                // Cipher suites — Firefox 120 order, no GREASE (15 suites = 30 bytes = 0x1e).
++                // 1301,1303,1302, c02b,c02f,cca9,cca8,c02c,c030, c013,c014, 009c,009d,002f,0035
++                Op::string("\x00\x1e"
++                           "\x13\x01\x13\x03\x13\x02"
++                           "\xc0\x2b\xc0\x2f\xcc\xa9\xcc\xa8\xc0\x2c\xc0\x30"
++                           "\xc0\x13\xc0\x14"
++                           "\x00\x9c\x00\x9d\x00\x2f\x00\x35"
++                           "\x01\x00", 34),
++                Op::begin_scope(),
++                // SNI is always the first extension in Firefox — not permuted.
++                Op::string("\x00\x00", 2),
++                Op::begin_scope(),
++                Op::begin_scope(),
++                Op::string("\x00", 1),
++                Op::begin_scope(),
++                Op::domain(),
++                Op::end_scope(),
++                Op::end_scope(),
++                Op::end_scope(),
++                Op::permutation({
++                    // extended_master_secret (0x0017)
++                    { Op::string("\x00\x17\x00\x00", 4) },
++                    // renegotiation_info (0xff01, empty RI)
++                    { Op::string("\xff\x01\x00\x01\x00", 5) },
++                    // supported_groups (0x000a): x25519, P-256, P-384, P-521 — no GREASE
++                    { Op::string("\x00\x0a\x00\x0a\x00\x08"
++                                 "\x00\x1d\x00\x17\x00\x18\x00\x19", 14) },
++                    // ec_point_formats (0x000b)
++                    { Op::string("\x00\x0b\x00\x02\x01\x00", 6) },
++                    // session_ticket (0x0023, empty)
++                    { Op::string("\x00\x23\x00\x00", 4) },
++                    // ALPN (0x0010): h2, http/1.1
++                    { Op::string("\x00\x10\x00\x0e\x00\x0c"
++                                 "\x02\x68\x32"
++                                 "\x08\x68\x74\x74\x70\x2f\x31\x2e\x31", 18) },
++                    // status_request / OCSP stapling (0x0005)
++                    { Op::string("\x00\x05\x00\x05\x01\x00\x00\x00\x00", 9) },
++                    // signature_algorithms (0x000d) — Firefox 120: 11 schemes
++                    { Op::string("\x00\x0d\x00\x18\x00\x16"
++                                 "\x04\x03\x05\x03\x06\x03"
++                                 "\x08\x04\x08\x05\x08\x06"
++                                 "\x04\x01\x05\x01\x06\x01"
++                                 "\x02\x03\x02\x01", 28) },
++                    // key_share (0x0033): x25519 only, no GREASE, no ML-KEM
++                    {
++                        Op::string("\x00\x33", 2),
++                        Op::begin_scope(),
++                        Op::begin_scope(),
++                        Op::string("\x00\x1d\x00\x20", 4),
++                        Op::K(),
++                        Op::end_scope(),
++                        Op::end_scope(),
++                    },
++                    // supported_versions (0x002b): TLS 1.3 + TLS 1.2 only, no GREASE
++                    { Op::string("\x00\x2b\x00\x05\x04\x03\x04\x03\x03", 9) },
++                    // psk_key_exchange_modes (0x002d): psk_dhe_ke
++                    { Op::string("\x00\x2d\x00\x02\x01\x01", 6) },
++                    // record_size_limit (0x001c): 16385 — Firefox-specific, absent in Chrome
++                    { Op::string("\x00\x1c\x00\x02\x40\x01", 6) },
++                }),
++                Op::end_scope(),
++                Op::end_scope(),
++                Op::end_scope()
++        };
++        return res;
++    }
++
++    // Randomly pick Chrome 131 or Firefox 120 TLS fingerprint per connection.
++    // Uses RAND_bytes so the choice is cryptographically unpredictable.
++    // Chrome profile: getDefault() (static, reused — GREASE re-rolled per TlsHello ctor).
++    // Firefox profile: getFirefox() (non-static, new instance per call).
++    static TlsHello getRandom() {
++        uint8_t r;
++        RAND_bytes(&r, 1);
++        return (r & 1) ? getDefault() : getFirefox();
++    }
++
+     uint32_t writeToBuffer(uint8_t *data) {
+         uint32_t offset = 0;
+         for (auto op : ops) {
+@@ -920,20 +1038,38 @@
+                         lastEventTime = ConnectionsManager::getInstance(instanceNum).getCurrentTimeMonotonicMillis();
+                         tlsHashMismatch = false;
+                         proxyAuthState = 11;
+-                        TlsHello hello = TlsHello::getDefault();
++                        TlsHello hello = TlsHello::getRandom();
+                         hello.setDomain(currentSecretDomain);
+                         uint32_t size = hello.writeToBuffer(tempBuffer->bytes);
+                         uint32_t outLength;
+                         HMAC(EVP_sha256(), currentSecret.data(), currentSecret.size(), tempBuffer->bytes, size, tempBuffer->bytes + 64 * 1024, &outLength);
+ 
+                         int32_t currentTime = ConnectionsManager::getInstance(instanceNum).getCurrentTime();
++                        // Apply ±15 s jitter to the timestamp XOR field to prevent
++                        // DPI correlation via precise Unix-timestamp matching.
++                        uint8_t jitter_byte;
++                        RAND_bytes(&jitter_byte, 1);
++                        currentTime += (int32_t)(jitter_byte & 0x1f) - 15;
+                         int32_t old = ((int32_t *) (tempBuffer->bytes + 64 * 1024 + 28))[0];
+                         ((int32_t *) (tempBuffer->bytes + 64 * 1024 + 28))[0] = old ^ currentTime;
+ 
+                         memcpy(tempBuffer->bytes + 11, tempBuffer->bytes + 64 * 1024, 32);
+                         bytesRead = 0;
+ 
+-                        if (send(socketFd, tempBuffer->bytes, size, 0) < 0) {
++                        // Split ClientHello into two TCP segments to defeat stateless DPI
++                        // signature matching. TCP_NODELAY is already set at socket open,
++                        // so each send() syscall becomes its own IP packet.
++                        // Split point is randomised in [5, 39]: TLS record header always
++                        // lands in the first packet, but the exact boundary varies per conn.
++                        uint8_t split_rand;
++                        RAND_bytes(&split_rand, 1);
++                        uint32_t split = 5u + (uint32_t)(split_rand % 35u);
++                        if (split >= size) { split = size / 2u; }
++                        bool send_failed = (send(socketFd, tempBuffer->bytes, split, 0) < 0);
++                        if (!send_failed && split < size) {
++                            send_failed = (send(socketFd, tempBuffer->bytes + split, size - split, 0) < 0);
++                        }
++                        if (send_failed) {
+                             if (LOGS_ENABLED) DEBUG_E("connection(%p) send failed", this);
+                             closeSocket(1, -1);
+                             return;
