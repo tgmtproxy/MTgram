@@ -85,6 +85,7 @@ jobs:
           max-size: 5G
           verbose: 2
           save: ${{ github.event_name != 'pull_request' }}
+          update-package-index: true
 
       - name: write API_KEYS
         env:
