@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 21 Apr 2026 14:51:40 +0300
+Subject: fix bubble jump when ime height changes while send animation is pending
+
+---
+ .../java/org/telegram/ui/TextMessageEnterTransition.java    | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/TextMessageEnterTransition.java b/TMessagesProj/src/main/java/org/telegram/ui/TextMessageEnterTransition.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/TextMessageEnterTransition.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/TextMessageEnterTransition.java
+@@ -356,9 +356,6 @@ public class TextMessageEnterTransition implements MessageEnterTransitionContain
+             drawableFromTop -= dp(46);
+         }
+ 
+-        listViewTargetBottomPadding = listView.getPaddingBottom()
+-            - (chatActivity.getInputIslandHeightTarget() - dp(44));
+-
+         gradientMatrix = new Matrix();
+         gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+         gradientPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+@@ -431,7 +428,6 @@ public class TextMessageEnterTransition implements MessageEnterTransitionContain
+     private final RectF messageReplySelectorRect = new RectF();
+     private Path replyRoundRect;
+     private float[] roundRectRadii;
+-    private float listViewTargetBottomPadding;
+ 
+     public void onDraw(Canvas canvas) {
+         if (drawBitmaps && !initBitmaps && crossfadeTextBitmap != null && messageView.getTransitionParams().wasDraw) {
+@@ -461,7 +457,7 @@ public class TextMessageEnterTransition implements MessageEnterTransitionContain
+             messageViewX = messageView.getX() + listView.getX() - container.getX();
+             messageViewY = messageView.getTop() + messageView.getPaddingTop() + listView.getTop() - container.getY();
+ 
+-            messageViewY -= (listViewTargetBottomPadding - listView.getPaddingBottom());
++            messageViewY += (chatActivity.getInputIslandHeightTarget() - dp(44));
+ 
+             lastMessageX = messageViewX;
+             lastMessageY = messageViewY;

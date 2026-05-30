@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Sun, 12 Apr 2026 17:20:59 +0300
+Subject: show an icon for mutual contacts in contacts view
+
+---
+ .../telegram/ui/Adapters/ContactsAdapter.java |  2 +-
+ .../java/org/telegram/ui/Cells/UserCell.java  | 20 +++++++++++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/ContactsAdapter.java b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/ContactsAdapter.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/ContactsAdapter.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/ContactsAdapter.java
+@@ -447,7 +447,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
+                 break;
+             }
+             case USER_CELL: {
+-                UserCell cell = new UserCell(mContext, 58, 1, false);
++                UserCell cell = new UserCell(mContext, 58, 1, false, false, null, true);
+                 cell.setCallCellStyle(58);
+                 view = cell;
+                 break;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/UserCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/UserCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/UserCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/UserCell.java
+@@ -76,6 +76,7 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
+     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatus;
+     private ImageView closeView;
+     protected Theme.ResourcesProvider resourcesProvider;
++    private ImageView inu_mutualView;
+ 
+     protected AvatarDrawable avatarDrawable;
+     private boolean storiable;
+@@ -132,6 +133,10 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
+     private final int padding;
+ 
+     public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton, Theme.ResourcesProvider resourcesProvider) {
++        this(context, padding, checkbox, admin, needAddButton, resourcesProvider, false);
++    }
++
++    public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton, Theme.ResourcesProvider resourcesProvider, boolean inu_needMutualIcon) {
+         super(context);
+         this.resourcesProvider = resourcesProvider;
+ 
+@@ -229,6 +234,18 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
+             addView(adminTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP, LocaleController.isRTL ? 23 : 0, 10, LocaleController.isRTL ? 0 : 23, 0));
+         }
+ 
++        if (inu_needMutualIcon) {
++            inu_mutualView = new ImageView(context);
++            inu_mutualView.setImageResource(R.drawable.player_new_repeatall);
++            inu_mutualView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_player_actionBarSelector)));
++            inu_mutualView.setScaleType(ImageView.ScaleType.CENTER);
++            inu_mutualView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
++            inu_mutualView.setVisibility(GONE);
++            inu_mutualView.setContentDescription(LocaleController.getString(R.string.InuMutualContact));
++            inu_mutualView.setOnClickListener(v -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, org.telegram.ui.Components.Bulletin.TYPE_ERROR, LocaleController.getString(R.string.InuMutualContactDescription)));
++            addView(inu_mutualView, LayoutHelper.createFrame(40, 40, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.CENTER_VERTICAL, LocaleController.isRTL ? 8 : 0, 0, LocaleController.isRTL ? 0 : 8, 0));
++        }
++
+         setFocusable(true);
+     }
+ 
+@@ -736,6 +753,9 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
+         avatarImageView.setRoundRadius(currentChat != null && currentChat.forum ? dp(14) : dp(24));
+ 
+         nameTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
++        if (inu_mutualView != null) {
++            inu_mutualView.setVisibility(currentUser != null && currentUser.mutual_contact ? VISIBLE : GONE);
++        }
+     }
+ 
+     public void setSelfAsSavedMessages(boolean value) {

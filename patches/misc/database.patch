@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 09:36:00 +0300
+Subject: fork-specific database migration hook
+
+---
+ .../src/main/java/org/telegram/messenger/MessagesStorage.java    | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
+@@ -378,6 +378,7 @@ public class MessagesStorage extends BaseController {
+                         throw new RuntimeException("malformed");
+                     }
+                 }
++                desu.inugram.helpers.InuDatabaseHelper.migrate(MessagesStorage.this);
+             }
+             databaseCreated = true;
+         } catch (Exception e) {

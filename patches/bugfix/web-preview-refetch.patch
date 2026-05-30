@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 25 May 2026 04:05:46 +0400
+Subject: prevent web preview from refetching the same link when typing
+
+---
+ .../java/org/telegram/ui/ChatActivity.java     | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -13837,7 +13837,7 @@ public class ChatActivity extends BaseFragment implements
+             return;
+         }
+         checkEditLinkRemoved(charSequence);
+-        if (force && foundWebPage != null) {
++        if (force && foundWebPage != null && !(foundWebPage instanceof TLRPC.TL_webPagePending)) {
+             if (foundWebPage.url != null) {
+                 int index = TextUtils.indexOf(charSequence, foundWebPage.url);
+                 char lastChar = 0;
+@@ -13870,12 +13870,6 @@ public class ChatActivity extends BaseFragment implements
+         }
+         final MessagesController messagesController = getMessagesController();
+         Utilities.searchQueue.postRunnable(() -> {
+-            boolean requestAnyway = false;
+-            if (linkSearchRequestId != 0) {
+-                getConnectionsManager().cancelRequest(linkSearchRequestId, true);
+-                linkSearchRequestId = 0;
+-                requestAnyway = true;
+-            }
+             ArrayList<CharSequence> urls = null;
+             CharSequence textToCheck;
+             try {
+@@ -13909,10 +13903,14 @@ public class ChatActivity extends BaseFragment implements
+                             clear = false;
+                         }
+                     }
+-                    if (clear && !requestAnyway) {
++                    if (clear) {
+                         return;
+                     }
+                 }
++                if (linkSearchRequestId != 0) {
++                    getConnectionsManager().cancelRequest(linkSearchRequestId, true);
++                    linkSearchRequestId = 0;
++                }
+                 foundUrls = urls;
+                 if (urls == null) {
+                     AndroidUtilities.runOnUIThread(() -> {
+@@ -13932,6 +13930,10 @@ public class ChatActivity extends BaseFragment implements
+                     });
+                     return;
+                 }
++                if (linkSearchRequestId != 0) {
++                    getConnectionsManager().cancelRequest(linkSearchRequestId, true);
++                    linkSearchRequestId = 0;
++                }
+                 textToCheck = charSequence;
+             }
+             final String firstUrl = urls == null || urls.isEmpty() ? null : urls.get(0).toString();

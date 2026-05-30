@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 05:42:35 +0300
+Subject: show seconds in timestamps
+
+---
+ .../src/main/java/org/telegram/messenger/LocaleController.java | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+@@ -73,6 +73,9 @@ public class LocaleController {
+ 
+     private volatile FastDateFormat formatterDay;
+     public FastDateFormat getFormatterDay() {
++        if (desu.inugram.InuConfig.SHOW_SECONDS.getValue()) {
++            return getFormatterDayWithSeconds();
++        }
+         if (formatterDay == null) {
+             synchronized (this) {
+                 if (formatterDay == null) {

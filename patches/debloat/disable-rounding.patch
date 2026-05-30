@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 05:47:40 +0300
+Subject: disable number rounding
+
+---
+ .../main/java/org/telegram/messenger/LocaleController.java    | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/LocaleController.java
+@@ -2919,6 +2919,10 @@ public class LocaleController {
+     }
+ 
+     public static String formatShortNumber(int number, int[] rounded) {
++        if (desu.inugram.InuConfig.DISABLE_ROUNDING.getValue()) {
++            if (rounded != null) rounded[0] = number;
++            return String.format(Locale.getDefault(), "%,d", number);
++        }
+         StringBuilder K = new StringBuilder();
+         int lastDec = 0;
+         int KCount = 0;

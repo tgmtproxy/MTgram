@@ -1,0 +1,87 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 5 May 2026 17:49:14 +0200
+Subject: hooks inside LoginActivity
+
+---
+ .../java/org/telegram/ui/LoginActivity.java    | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/LoginActivity.java
+@@ -127,6 +127,7 @@ import org.telegram.messenger.MessagesStorage;
+ import org.telegram.messenger.NotificationCenter;
+ import org.telegram.messenger.PasskeysController;
+ import org.telegram.messenger.PushListenerController;
++import desu.inugram.helpers.LoginHelper;
+ import org.telegram.messenger.R;
+ import org.telegram.messenger.SRPHelper;
+ import org.telegram.messenger.SharedConfig;
+@@ -226,7 +227,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+             MODE_CHANGE_PHONE_NUMBER = 2,
+             MODE_CHANGE_LOGIN_EMAIL = 3;
+ 
+-    private final static int VIEW_PHONE_INPUT = 0,
++    public final static int VIEW_PHONE_INPUT = 0,
+             VIEW_CODE_MESSAGE = 1,
+             VIEW_CODE_SMS = 2,
+             VIEW_CODE_FLASH_CALL = 3,
+@@ -347,6 +348,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+     private RadialProgressView radialProgressView;
+ 
+     private ImageView proxyButtonView;
++    private ImageView menuButton;
+     private ProxyDrawable proxyDrawable;
+ 
+     // Open animation stuff
+@@ -568,6 +570,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+                 marginLayoutParams = (MarginLayoutParams) proxyButtonView.getLayoutParams();
+                 marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
+ 
++                marginLayoutParams = (MarginLayoutParams) menuButton.getLayoutParams();
++                marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
++
+                 marginLayoutParams = (MarginLayoutParams) radialProgressView.getLayoutParams();
+                 marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
+ 
+@@ -754,15 +759,17 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+         proxyButtonView.setOnClickListener(v -> presentFragment(new ProxyListActivity()));
+         proxyButtonView.setAlpha(0f);
+         proxyButtonView.setVisibility(View.GONE);
+-        sizeNotifierFrameLayout.addView(proxyButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 16, 16));
++        sizeNotifierFrameLayout.addView(proxyButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 56, 16));
+         updateProxyButton(false, true);
+ 
++        menuButton = LoginHelper.addMenuButton(sizeNotifierFrameLayout, this, currentAccount, () -> activityMode == MODE_LOGIN && currentViewNum == VIEW_PHONE_INPUT);
++
+         radialProgressView = new RadialProgressView(context);
+         radialProgressView.setSize(AndroidUtilities.dp(20));
+         radialProgressView.setAlpha(0);
+         radialProgressView.setScaleX(0.1f);
+         radialProgressView.setScaleY(0.1f);
+-        sizeNotifierFrameLayout.addView(radialProgressView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 0, 16, 16, 0));
++        sizeNotifierFrameLayout.addView(radialProgressView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 0, 16, 32, 0));
+ 
+         floatingButtonIcon = new TransformableLoginButtonView(context);
+         floatingButtonIcon.setTransformType(TransformableLoginButtonView.TRANSFORM_OPEN_ARROW);
+@@ -1627,7 +1634,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+         onAuthSuccess(res);
+     }
+ 
+-    private void onAuthSuccess(TLRPC.TL_auth_authorization res) {
++    public void onAuthSuccess(TLRPC.TL_auth_authorization res) {
+         onAuthSuccess(res, false);
+     }
+ 
+@@ -3262,9 +3269,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
+                         }
+                     }
+                 }
+-                if (activityMode == MODE_LOGIN) {
+-                    requestPasskey(false);
+-                }
+             }, SHOW_DELAY);
+         }
+ 

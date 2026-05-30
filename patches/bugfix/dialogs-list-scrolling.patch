@@ -1,0 +1,77 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 14 Apr 2026 03:29:17 +0300
+Subject: fix some glitches with the pull-to-reveal-archive mode in dialogs list
+
+---
+ .../java/org/telegram/ui/DialogsActivity.java | 25 ++++++++++++-------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+@@ -1658,10 +1658,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+         }
+     }
+ 
+-    public static float viewOffset = 0.0f;
+-
+     public class DialogsRecyclerView extends BlurredRecyclerView implements StoriesListPlaceProvider.ClippedView {
+ 
++        public float viewOffset = 0.0f;
+         public boolean updateDialogsOnNextDraw;
+         private boolean firstLayout = true;
+         private boolean ignoreLayout;
+@@ -1701,7 +1700,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+         }
+ 
+         public void setViewsOffset(float viewOffset) {
+-            DialogsActivity.viewOffset = viewOffset;
++            this.viewOffset = viewOffset;
+             int n = getChildCount();
+             for (int i = 0; i < n; i++) {
+                 getChildAt(i).setTranslationY(viewOffset);
+@@ -2012,7 +2011,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+                 RecyclerView.ViewHolder holder = parentPage.listView.findViewHolderForAdapterPosition(pos);
+                 if (holder != null) {
+                     int top = holder.itemView.getTop();
+-                    if (parentPage.dialogsType == DIALOGS_TYPE_DEFAULT && hasHiddenArchive() && parentPage.archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN) {
++                    if (parentPage.dialogsType == DIALOGS_TYPE_DEFAULT && hasHiddenArchive() && parentPage.archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN && parentPage.listView.getScrollState() == RecyclerView.SCROLL_STATE_IDLE) {
+                         pos = Math.max(1, pos);
+                     }
+                     ignoreLayout = true;
+@@ -8859,11 +8858,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             public void onAnimationEnd(Animator animation) {
+                 super.onAnimationEnd(animation);
+                 actionBarColorAnimator = null;
+-                actionModeFullyShowed = false;
+                 invalidateScrollY = true;
+-                fixScrollYAfterArchiveOpened = true;
+                 fragmentView.invalidate();
+-                scrollAdditionalOffset = -(dp((hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + SEARCH_FIELD_HEIGHT) - finalTranslateListHeight);
++                if (actionModeFullyShowed) {
++                    actionModeFullyShowed = false;
++                    fixScrollYAfterArchiveOpened = true;
++                    scrollAdditionalOffset = -(dp((hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + SEARCH_FIELD_HEIGHT) - finalTranslateListHeight);
++                } else {
++                    scrollAdditionalOffset = 0;
++                }
+                 viewPages[0].setTranslationY(0);
+                 for (int i = 0; i < viewPages.length; i++) {
+                     if (viewPages[i] != null) {
+@@ -9849,8 +9852,12 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+                     super.onAnimationEnd(animation);
+                     actionBarColorAnimator = null;
+                     actionModeAdditionalHeight = 0;
+-                    actionModeFullyShowed = true;
+-                    scrollAdditionalOffset = dp((hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + SEARCH_FIELD_HEIGHT) - finalTranslateListHeight;
++                    if (finalTranslateListHeight > 0) {
++                        actionModeFullyShowed = true;
++                        scrollAdditionalOffset = dp((hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + SEARCH_FIELD_HEIGHT) - finalTranslateListHeight;
++                    } else {
++                        scrollAdditionalOffset = 0;
++                    }
+                     viewPages[0].setTranslationY(0);
+                     for (int i = 0; i < viewPages.length; i++) {
+                         if (viewPages[i] != null) {

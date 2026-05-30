@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 29 May 2026 00:05:33 +0400
+Subject: disable channels quick share on long tap
+
+---
+ .../src/main/java/org/telegram/ui/Cells/ChatMessageCell.java   | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+@@ -12189,7 +12189,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+             } else if (sideButtonPressed) {
+                 if (pressedSideButton != SIDE_BUTTON_SPONSORED_CLOSE &&
+                     pressedSideButton != SIDE_BUTTON_SPONSORED_MORE &&
+-                    pressedSideButton != 3 && pressedSideButton != 2
++                    pressedSideButton != 3 && pressedSideButton != 2 &&
++                    !desu.inugram.InuConfig.DISABLE_QUICK_SHARE.getValue()
+                 ) {
+                     delegate.didQuickShareStart(this, lastTouchX, lastTouchY);
+                     sideButtonPressed = false;

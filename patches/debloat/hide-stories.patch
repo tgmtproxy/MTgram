@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 04:03:43 +0300
+Subject: hide stories
+
+---
+ TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java   | 2 +-
+ .../main/java/org/telegram/ui/Stories/StoriesController.java    | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -38486,7 +38486,7 @@ public class ChatActivity extends BaseFragment implements
+                     arrayList = new ArrayList<>();
+                     arrayList.add(messageObject);
+                 }
+-                final boolean includeStory = getMessagesController().storiesEnabled() && StoryEntry.canRepostMessage(messageObject);
++                final boolean includeStory = getMessagesController().storiesEnabled() && StoryEntry.canRepostMessage(messageObject) && !InuConfig.HIDE_REPOST_TO_STORY.getValue();
+                 showDialog(new ShareAlert(getContext(), ChatActivity.this, arrayList, null, null, ChatObject.isChannel(currentChat), null, null, false, false, includeStory, null, themeDelegate) {
+                     { includeStoryFromMessage = includeStory; }
+                     @Override
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java b/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
+@@ -282,6 +282,7 @@ public class StoriesController {
+     }
+ 
+     public boolean hasStories() {
++        if (desu.inugram.InuConfig.HIDE_STORIES.getValue()) return false;
+         return (dialogListStories != null && dialogListStories.size() > 0) || hasSelfStories();
+     }
+ 

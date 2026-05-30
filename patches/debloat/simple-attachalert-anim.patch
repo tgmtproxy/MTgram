@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 17 Apr 2026 05:33:20 +0300
+Subject: remove the bouncy animation in ChatAttachAlert
+
+---
+ .../telegram/ui/Components/ChatAttachAlert.java    | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ChatAttachAlert.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ChatAttachAlert.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ChatAttachAlert.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ChatAttachAlert.java
+@@ -4488,6 +4488,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
+             updateDoneItemEnabled();
+         };
+ 
++        animated = animated && !desu.inugram.InuConfig.SIMPLE_ATTACH_POPUP_ANIMATION.getValue();
+         if (!(currentAttachLayout instanceof ChatAttachAlertPhotoLayoutPreview || nextAttachLayout instanceof ChatAttachAlertPhotoLayoutPreview)) {
+             if (animated) {
+                 AnimatorSet animator = new AnimatorSet();
+@@ -4533,6 +4534,14 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
+                 ATTACH_ALERT_LAYOUT_TRANSLATION.set(currentAttachLayout, 0f);
+                 animator.start();
+             } else {
++                nextAttachLayout.setAlpha(1.0f);
++                nextAttachLayout.setTranslationY(0);
++                if (containerView.getMeasuredWidth() > 0 && containerView.getMeasuredHeight() > 0) {
++                    containerView.measure(
++                            View.MeasureSpec.makeMeasureSpec(containerView.getMeasuredWidth(), View.MeasureSpec.EXACTLY),
++                            View.MeasureSpec.makeMeasureSpec(containerView.getMeasuredHeight(), View.MeasureSpec.EXACTLY)
++                    );
++                }
+                 currentAttachLayout.setAlpha(0.0f);
+                 onEnd.run();
+                 updateSelectedPosition(0);
+@@ -5065,7 +5074,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
+             appearSpringAnimation.cancel();
+         }
+         appearSpringAnimation = new SpringAnimation(super.containerView, DynamicAnimation.TRANSLATION_Y, 0);
+-        if (editingMessageObject != null) {
++        if (desu.inugram.InuConfig.SIMPLE_ATTACH_POPUP_ANIMATION.getValue()) {
++            appearSpringAnimation.getSpring().setDampingRatio(1.0f);
++            appearSpringAnimation.getSpring().setStiffness(1500.0f);
++        } else if (editingMessageObject != null) {
+             appearSpringAnimation.getSpring().setDampingRatio(0.75f);
+             appearSpringAnimation.getSpring().setStiffness(350.0f);
+         } else {

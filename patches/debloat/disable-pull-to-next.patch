@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 00:57:13 +0300
+Subject: disable pull to next channel
+
+---
+ .../src/main/java/org/telegram/ui/ChatActivity.java         | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -6507,7 +6507,7 @@ public class ChatActivity extends BaseFragment implements
+                 if (!foundTopView) {
+                     scrolled = super.scrollVerticallyBy(dy, recycler, state);
+                 }
+-                final boolean allowPullingDownScroll = !isInPollAddOptionMode() && !hasSelectedMessages();
++                final boolean allowPullingDownScroll = !InuConfig.DISABLE_PULL_TO_NEXT.getValue() && !isInPollAddOptionMode() && !hasSelectedMessages();
+                 if (allowPullingDownScroll && dy > 0 && scrolled == 0 && (ChatObject.isChannel(currentChat) && !currentChat.megagroup || isTopic && !UserObject.isBotForum(currentUser)) && chatMode != MODE_SAVED && chatMode != MODE_SCHEDULED && chatListView.getScrollState() == RecyclerView.SCROLL_STATE_DRAGGING && !chatListView.isFastScrollAnimationRunning() && !chatListView.isMultiselect() && !isReport()) {
+                     if (pullingDownOffset == 0 && pullingDownDrawable != null) {
+                         if (nextChannels != null && !nextChannels.isEmpty()) {
+@@ -25304,13 +25304,13 @@ public class ChatActivity extends BaseFragment implements
+                 if (obj.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL && messages.size() == 2) {
+                     placeToPaste = 1;
+                 }
+-                
++
+                 if (hasSentMessages) {
+                     if (chatAdapter != null) {
+                         chatAdapter.checkRemoveBotForumRowsStartThreadRow(true);
+                     }
+                 }
+-                
++
+                 if (dayArray == null) {
+                     dayArray = new ArrayList<>();
+                     messagesByDays.put(obj.dateKey, dayArray);

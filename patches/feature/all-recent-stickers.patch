@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 06:16:26 +0300
+Subject: show all recent stickers
+
+---
+ .../main/java/org/telegram/messenger/MediaDataController.java  | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+@@ -911,7 +911,8 @@ public class MediaDataController extends BaseController {
+         if (type == TYPE_PREMIUM_STICKERS) {
+             return new ArrayList<>(recentStickers[type]);
+         }
+-        ArrayList<TLRPC.Document> result = new ArrayList<>(arrayList.subList(0, Math.min(arrayList.size(), 20)));
++        int limit = desu.inugram.InuConfig.SHOW_ALL_RECENT_STICKERS.getValue() ? arrayList.size() : 20;
++        ArrayList<TLRPC.Document> result = new ArrayList<>(arrayList.subList(0, Math.min(arrayList.size(), limit)));
+         if (firstEmpty && !result.isEmpty() && !StickersAlert.DISABLE_STICKER_EDITOR) {
+             result.add(0, new TLRPC.TL_documentEmpty());
+         }

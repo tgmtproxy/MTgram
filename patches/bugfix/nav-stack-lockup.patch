@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 27 Apr 2026 18:00:37 +0300
+Subject: hopefully fix nav stack sometimes locking up after rapid back swipes
+
+---
+ .../org/telegram/ui/ActionBar/ActionBarLayout.java  | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/ActionBarLayout.java b/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/ActionBarLayout.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/ActionBarLayout.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/ActionBarLayout.java
+@@ -1277,7 +1277,16 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
+     public void onSlideAnimationEnd(final boolean backAnimation) {
+         if (!backAnimation) {
+             if (fragmentsStack.size() < 2) {
++                // racing closeLastFragment drained the stack mid-animation;
++                // must reset state below, else animationInProgress / startedTracking lock nav
+                 checkBlackScreen("onSlideAnimationEnd exit");
++                containerViewBack.setVisibility(View.INVISIBLE);
++                startedTracking = false;
++                animationInProgress = false;
++                containerView.setTranslationX(0);
++                containerViewBack.setTranslationX(0);
++                containerView.setLayerType(LAYER_TYPE_NONE, null);
++                setInnerTranslationX(0);
+                 return;
+             }
+             BaseFragment lastFragment = fragmentsStack.get(fragmentsStack.size() - 1);
+@@ -1937,7 +1946,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
+         boolean preview = params.preview;
+         ActionBarPopupWindow.ActionBarPopupWindowLayout menu = params.menuView;
+ 
+-        if (fragment == null || checkTransitionAnimation() || delegate != null && check && !delegate.needPresentFragment(this, params) || !fragment.onFragmentCreate()) {
++        if (fragment == null || checkTransitionAnimation() || animationInProgress || startedTracking || delegate != null && check && !delegate.needPresentFragment(this, params) || !fragment.onFragmentCreate()) {
+             return false;
+         }
+         if (inPreviewMode && !preview && desu.inugram.InuConfig.INTERACTIVE_CHAT_PREVIEW.getValue()) {
+@@ -2517,7 +2526,7 @@ public class ActionBarLayout extends FrameLayout implements INavigationLayout, F
+         if (fragment != null && fragment.closeLastFragment()) {
+             return;
+         }
+-        if (delegate != null && !delegate.needCloseLastFragment(this) || checkTransitionAnimation() || fragmentsStack.isEmpty()) {
++        if (delegate != null && !delegate.needCloseLastFragment(this) || checkTransitionAnimation() || animationInProgress || startedTracking || fragmentsStack.isEmpty()) {
+             return;
+         }
+         if (parentActivity.getCurrentFocus() != null) {

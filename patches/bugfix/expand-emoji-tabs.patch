@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 25 May 2026 20:37:37 +0400
+Subject: expand emoji tabs when there's enough space to fit without scrolling
+
+---
+ .../ui/Components/EmojiTabsStrip.java         | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiTabsStrip.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiTabsStrip.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiTabsStrip.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiTabsStrip.java
+@@ -209,6 +209,20 @@ public class EmojiTabsStrip extends ScrollableHorizontalScrollView {
+             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                 final int AT_MOST = MeasureSpec.makeMeasureSpec(99999999, MeasureSpec.AT_MOST);
+                 int width = getPaddingLeft() + getPaddingRight() - (int) (recentIsShown || recentTab == null ? 0 : recentTab.getAlpha() * AndroidUtilities.dp(30 + 3)) - (int) (giftsIsShown || giftsTab == null ? 0 : giftsTab.getAlpha() * AndroidUtilities.dp(30 + 3));
++                if (includeAnimated && emojiTabs != null) {
++                    int n = getChildCount();
++                    int usedByOthers = getPaddingLeft() + getPaddingRight()
++                        - (int) (recentIsShown || recentTab == null ? 0 : recentTab.getAlpha() * AndroidUtilities.dp(30 + 3))
++                        - (int) (giftsIsShown || giftsTab == null ? 0 : giftsTab.getAlpha() * AndroidUtilities.dp(30 + 3));
++                    for (int i = 0; i < n; ++i) {
++                        View child = getChildAt(i);
++                        if (child == null || child == emojiTabs) continue;
++                        child.measure(AT_MOST, heightMeasureSpec);
++                        usedByOthers += child.getMeasuredWidth();
++                    }
++                    usedByOthers += Math.max(0, n - 1) * AndroidUtilities.dp(3);
++                    emojiTabs.inu_targetWidth = MeasureSpec.getSize(widthMeasureSpec) - usedByOthers;
++                }
+                 for (int i = 0; i < getChildCount(); ++i) {
+                     View child = getChildAt(i);
+                     if (child != null) {
+@@ -1402,6 +1416,7 @@ public class EmojiTabsStrip extends ScrollableHorizontalScrollView {
+ 
+     private class EmojiTabsView extends ScrollableHorizontalScrollView {
+         public long id;
++        public int inu_targetWidth = 0;
+ 
+         public EmojiTabsView(Context context) {
+             super(context);
+@@ -1458,6 +1473,13 @@ public class EmojiTabsStrip extends ScrollableHorizontalScrollView {
+         }
+ 
+         public int maxWidth() {
++            if (inu_targetWidth > 0) {
++                int stockMax = AndroidUtilities.dp((30 + 2) * Math.min(5.7f, contentView.getChildCount()));
++                if (inu_targetWidth > stockMax) {
++                    int natural = AndroidUtilities.dp((30 + 2) * contentView.getChildCount());
++                    return Math.min(natural, inu_targetWidth);
++                }
++            }
+ //            return AndroidUtilities.dp((30 + 2) * (clip() ? Math.min(5.7f, contentView.getChildCount()) : contentView.getChildCount()));
+             return AndroidUtilities.dp((30 + 2) * Math.min(5.7f, contentView.getChildCount()));
+         }

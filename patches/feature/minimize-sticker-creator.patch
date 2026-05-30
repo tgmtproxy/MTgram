@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 16:08:08 +0300
+Subject: toggle minimizing of the sticker creator button in recent stickers
+
+---
+ .../telegram/messenger/MediaDataController.java |  2 +-
+ .../telegram/ui/Cells/StickerSetNameCell.java   |  7 +++++++
+ .../org/telegram/ui/Components/EmojiView.java   | 17 +++++++++++++++++
+ 3 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+@@ -913,7 +913,7 @@ public class MediaDataController extends BaseController {
+         }
+         int limit = desu.inugram.InuConfig.SHOW_ALL_RECENT_STICKERS.getValue() ? arrayList.size() : 20;
+         ArrayList<TLRPC.Document> result = new ArrayList<>(arrayList.subList(0, Math.min(arrayList.size(), limit)));
+-        if (firstEmpty && !result.isEmpty() && !StickersAlert.DISABLE_STICKER_EDITOR) {
++        if (firstEmpty && !result.isEmpty() && !StickersAlert.DISABLE_STICKER_EDITOR && !InuConfig.MINIMIZE_STICKERS_CREATOR.getValue()) {
+             result.add(0, new TLRPC.TL_documentEmpty());
+         }
+         return result;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/StickerSetNameCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/StickerSetNameCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/StickerSetNameCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/StickerSetNameCell.java
+@@ -201,6 +201,13 @@ public class StickerSetNameCell extends FrameLayout {
+         editView.setOnClickListener(whenClickedEdit);
+     }
+ 
++    public void setCreate(View.OnClickListener whenClickedEdit, View.OnLongClickListener whenLongClickedEdit) {
++        editView.setVisibility(View.VISIBLE);
++        editView.setText(LocaleController.getString(R.string.Create).toLowerCase());
++        editView.setOnClickListener(whenClickedEdit);
++        editView.setOnLongClickListener(whenLongClickedEdit);
++    }
++
+     public void setHeaderOnClick(View.OnClickListener listener) {
+         textView.setOnClickListener(listener);
+     }
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/EmojiView.java
+@@ -167,6 +167,7 @@ import java.util.List;
+ import java.util.Map;
+ import java.util.Objects;
+ 
++import desu.inugram.InuConfig;
+ import me.vkryl.android.animator.BoolAnimator;
+ import me.vkryl.android.animator.FactorAnimator;
+ 
+@@ -6865,6 +6866,11 @@ public class EmojiView extends FrameLayout implements
+                             ((ChatActivity) fragment).openAttachMenuForCreatingSticker();
+                         }
+                     });
++                    containerLayout.setOnLongClickListener(v -> {
++                        InuConfig.MINIMIZE_STICKERS_CREATOR.toggle();
++                        checkDocuments(false);
++                        return true;
++                    });
+ 
+                     final ImageView icon = new ImageView(context);
+                     icon.setImageResource(R.drawable.menu_sticker_add);
+@@ -6959,6 +6965,17 @@ public class EmojiView extends FrameLayout implements
+                             }
+                         } else if (object == recentStickers) {
+                             cell.setText(getString(R.string.RecentStickers), R.drawable.msg_close, getString(R.string.ClearRecentStickersAlertTitle));
++                            if (InuConfig.MINIMIZE_STICKERS_CREATOR.getValue()) {
++                                cell.setCreate(v -> {
++                                    if (fragment instanceof ChatActivity) {
++                                        ((ChatActivity) fragment).openAttachMenuForCreatingSticker();
++                                    }
++                                }, v -> {
++                                    InuConfig.MINIMIZE_STICKERS_CREATOR.toggle();
++                                    checkDocuments(false);
++                                    return true;
++                                });
++                            }
+                         } else if (object == favouriteStickers) {
+                             cell.setText(getString(R.string.FavoriteStickers), 0);
+                         } else if (object == premiumStickers) {

@@ -1,0 +1,141 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 01:21:49 +0300
+Subject: disable channel bottom bar (mute and join buttons)
+
+---
+ .../java/org/telegram/ui/ChatActivity.java    | 28 +++++++++++++++----
+ .../chat/ChatInputViewsContainer.java         |  4 ++-
+ 2 files changed, 25 insertions(+), 7 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -4155,6 +4155,10 @@ public class ChatActivity extends BaseFragment implements
+             menu.addItem(edit_quick_reply, R.drawable.group_edit).setContentDescription(LocaleController.getString(R.string.Edit));
+         }
+ 
++        if (chatMode == MODE_PINNED) {
++            menu.addItem(ChatActionsHelper.ACTION_PINNED_UNPIN_ALL, R.drawable.msg_unpin).setVisibility(View.GONE);
++        }
++
+         if (UserObject.isBotForumWithEditableTopics(currentUser) && chatMode == 0) {
+             topicCreateItem = menu.addItem(chat_menu_topic_create, R.drawable.menu_topic_add_30);
+         }
+@@ -4300,7 +4304,7 @@ public class ChatActivity extends BaseFragment implements
+             }
+             if (currentChat != null) {
+                 headerItem.lazilyAddSubItem(open_direct, R.drawable.msg_markunread, getString(R.string.ChannelOpenDirect));
+-                headerItem.setSubItemShown(open_direct, ChatObject.isChannel(currentChat) && !ChatObject.isMonoForum(currentChat) && currentChat.linked_monoforum_id != 0 && ChatObject.canManageMonoForum(currentAccount, -currentChat.linked_monoforum_id));
++                headerItem.setSubItemShown(open_direct, ChatObject.isChannel(currentChat) && !ChatObject.isMonoForum(currentChat) && currentChat.linked_monoforum_id != 0 && (ChatObject.canManageMonoForum(currentAccount, -currentChat.linked_monoforum_id) || ChatHelper.shouldForceHideBottomBar(this)));
+             }
+             if (currentUser != null && chatMode != MODE_SAVED) {
+                 headerItem.lazilyAddSubItem(call, R.drawable.msg_callback, LocaleController.getString(R.string.Call));
+@@ -5195,7 +5199,7 @@ public class ChatActivity extends BaseFragment implements
+                     updateSkeletonColors();
+                     updateSkeletonGradient();
+ 
+-                    int lastTop = getHeight() - blurredViewBottomOffset - (int) (windowInsetsStateHolder.getAnimatedMaxBottomInset() + getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)) - dp(44 + 7 + 9 - 3);
++                    int lastTop = getHeight() - blurredViewBottomOffset - (int) (windowInsetsStateHolder.getAnimatedMaxBottomInset() + getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)) - (ChatHelper.shouldForceHideBottomBar(ChatActivity.this) ? 0 : dp(44 + 7 + 9 - 3));
+                     int j = 0;
+ 
+                     int childMaxTop = Integer.MAX_VALUE;
+@@ -8234,6 +8238,7 @@ public class ChatActivity extends BaseFragment implements
+             }
+         });
+         bottomChannelButtonsLayout.setButtonOnFullyVisibleListener(ChatActivityChannelButtonsLayout.BUTTON_GIFT, (v, id, firstTime) -> {
++            if (ChatHelper.shouldForceHideBottomBar(this)) return;
+             if (bottomGiftHintView == null && firstTime && (bottomSuggestHintView == null || !bottomSuggestHintView.shown()) && HintsController.Hint.ChannelGiftHint.show()) {
+                 AndroidUtilities.runOnUIThread(() -> {
+                     if (getContext() == null) return;
+@@ -8253,6 +8258,7 @@ public class ChatActivity extends BaseFragment implements
+             }
+         });
+         bottomChannelButtonsLayout.setButtonOnFullyVisibleListener(ChatActivityChannelButtonsLayout.BUTTON_DIRECT, (v, id, firstTime) -> {
++            if (ChatHelper.shouldForceHideBottomBar(this)) return;
+             if (bottomSuggestHintView == null && firstTime && HintsController.Hint.ChannelSuggestHint.show()) {
+                 AndroidUtilities.runOnUIThread(() -> {
+                     if (getContext() == null) return;
+@@ -17468,7 +17474,7 @@ public class ChatActivity extends BaseFragment implements
+             float canvasOffsetX = chatListView.getLeft() + cell.getX();
+             float canvasOffsetY = chatListView.getY() + cell.getY() + cell.getPaddingTop();
+             float alpha = cell.shouldDrawAlphaLayer() ? cell.getAlpha() : 1f;
+-            canvas.clipRect(chatListView.getLeft(), listTop, chatListView.getRight(), chatListView.getY() + chatListView.getMeasuredHeight() - blurredViewBottomOffset - windowInsetsStateHolder.getCurrentMaxBottomInset() - inputIslandHeightCurrent - dp(NonIslandHelper.chatElements() ? 0 : 9));
++            canvas.clipRect(chatListView.getLeft(), listTop, chatListView.getRight(), chatListView.getY() + chatListView.getMeasuredHeight() - blurredViewBottomOffset - inputIslandHeightCurrent - (ChatHelper.shouldForceHideBottomBar(ChatActivity.this) ? 0 : windowInsetsStateHolder.getCurrentMaxBottomInset() + dp(NonIslandHelper.chatElements() ? 0 : 9)));
+             canvas.translate(canvasOffsetX, canvasOffsetY);
+             cell.setInvalidatesParent(true);
+             if (type == 0) {
+@@ -17689,6 +17695,7 @@ public class ChatActivity extends BaseFragment implements
+                                     - inputIslandHeightCurrent
+                                     - dp(NonIslandHelper.chatElements() ? 0 : 9)
+                                     - (mentionContainer != null ? mentionContainer.clipBottom() : 0);
++                            if (ChatHelper.shouldForceHideBottomBar(ChatActivity.this)) viewClipBottom2 += windowInsetsStateHolder.getCurrentMaxBottomInset();
+ 
+                             canvas.clipRect(0, listTop + (mentionContainer != null ? mentionContainer.clipTop() : 0), getMeasuredWidth(), viewClipBottom2);
+                             canvas.translate(0, chatListView.getY());
+@@ -17709,6 +17716,7 @@ public class ChatActivity extends BaseFragment implements
+                             - inputIslandHeightCurrent
+                             - getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)
+                             - dp(NonIslandHelper.chatElements() ? 0 : 9);
++                        if (ChatHelper.shouldForceHideBottomBar(ChatActivity.this)) viewClipBottom += windowInsetsStateHolder.getCurrentMaxBottomInset();
+ 
+                         float clipTop = 0, clipBottom = 0;
+                         if (mentionContainer != null) {
+@@ -21590,7 +21598,7 @@ public class ChatActivity extends BaseFragment implements
+                 updateTopPanel(true);
+             }
+             if (headerItem != null) {
+-                headerItem.setSubItemShown(open_direct, ChatObject.isChannel(currentChat) && !ChatObject.isMonoForum(currentChat) && currentChat.linked_monoforum_id != 0 && ChatObject.canManageMonoForum(currentAccount, -currentChat.linked_monoforum_id));
++                headerItem.setSubItemShown(open_direct, ChatObject.isChannel(currentChat) && !ChatObject.isMonoForum(currentChat) && currentChat.linked_monoforum_id != 0 && (ChatObject.canManageMonoForum(currentAccount, -currentChat.linked_monoforum_id) || ChatHelper.shouldForceHideBottomBar(this)));
+             }
+         } else if (id == NotificationCenter.didReceiveNewMessages) {
+             FileLog.d("ChatActivity didReceiveNewMessages start");
+@@ -27167,7 +27175,10 @@ public class ChatActivity extends BaseFragment implements
+ 
+         boolean accentTextButton = false;
+         boolean forceVisible = false;
+-        boolean forceNoBottom = false;
++        boolean forceNoBottom = ChatHelper.shouldForceHideBottomBar(this);
++        if (chatInputViewsContainer != null && chatInputViewsContainer.getFadeView() != null) {
++            chatInputViewsContainer.getFadeView().setVisibility(forceNoBottom ? View.GONE : View.VISIBLE);
++        }
+         boolean showGiftButton = false;
+         boolean showSuggestButton = false;
+         boolean showSearchButton = chatMode == MODE_DEFAULT && ChatObject.isChannelOrGiga(currentChat);
+@@ -27243,6 +27254,11 @@ public class ChatActivity extends BaseFragment implements
+                 bottomOverlayChatText.setTag(null);
+                 bottomOverlayChatText.setText(LocaleController.getString(R.string.HidePinnedMessagesNoCaps));
+             }
++            ActionBarMenuItem unpinAllItem = actionBar.createMenu().getItem(desu.inugram.helpers.chat.ChatActionsHelper.ACTION_PINNED_UNPIN_ALL);
++            if (unpinAllItem != null) {
++                unpinAllItem.setVisibility(forceNoBottom ? View.VISIBLE : View.GONE);
++                unpinAllItem.setContentDescription(LocaleController.getString(allowPin ? R.string.UnpinAllMessagesNoCaps : R.string.HidePinnedMessagesNoCaps));
++            }
+             showBottomOverlayProgress(false, false);
+         } else if (currentUser != null && currentUser.id == UserObject.VERIFY) {
+             if (!getMessagesController().isDialogMuted(dialog_id, getTopicId())) {
+@@ -45511,7 +45527,7 @@ public class ChatActivity extends BaseFragment implements
+             pollAddVisibility = animatorPollAddAnswerVisibility.getFloatValue();
+         }
+ 
+-        if (!isInsideContainer && !isInPreviewMode()) {
++        if (!isInsideContainer && !isInPreviewMode() && !ChatHelper.shouldForceHideBottomBar(this)) {
+             return lerp(Math.max(lerp(defaultIslandHeight, enterViewIslandHeight, enterViewFactor) * visibility, dp(44)), -dp(7), pollAddVisibility);
+         } else {
+             return lerp(defaultIslandHeight, enterViewIslandHeight, enterViewFactor) * visibility;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/chat/ChatInputViewsContainer.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/chat/ChatInputViewsContainer.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/chat/ChatInputViewsContainer.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/chat/ChatInputViewsContainer.java
+@@ -273,7 +273,9 @@ public class ChatInputViewsContainer extends FrameLayout {
+         );
+         tmpRect.inset(0, -dp(7));
+         tmpRect.offset(0, blurTop + (int) bubbleInputTranlationY);
+-        if (desu.inugram.helpers.theme.NonIslandHelper.chatElements()) {
++        final boolean nonIsland = desu.inugram.helpers.theme.NonIslandHelper.chatElements();
++        final boolean hasBar = inputBubbleHeight > 0;
++        if (nonIsland && hasBar) {
+             tmpRect.top += dp(16);
+             tmpRect.bottom = getMeasuredHeight();
+             tmpRect.left = 0;

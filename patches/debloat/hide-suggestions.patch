@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 05:40:19 +0300
+Subject: hide server-pushed suggestions throughout the app
+
+---
+ .../src/main/java/org/telegram/messenger/BirthdayController.java | 1 +
+ .../src/main/java/org/telegram/messenger/MessagesController.java | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/BirthdayController.java b/TMessagesProj/src/main/java/org/telegram/messenger/BirthdayController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/BirthdayController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/BirthdayController.java
+@@ -131,6 +131,7 @@ public class BirthdayController {
+     }
+ 
+     public boolean contains() {
++        if (desu.inugram.InuConfig.HIDE_SUGGESTION_BIRTHDAY_CONTACTS.getValue()) return false;
+         final BirthdayState state = getState();
+         return state != null && !state.isTodayEmpty();
+     }
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+@@ -10591,6 +10591,7 @@ public class MessagesController extends BaseController implements NotificationCe
+                 noDialog = true;
+             } else if (response instanceof TLRPC.TL_help_promoData) {
+                 TLRPC.TL_help_promoData res = (TLRPC.TL_help_promoData) response;
++                desu.inugram.helpers.dialogs.SuggestionFilter.filterPromoData(res);
+ 
+                 long did;
+                 if (res.peer == null) {

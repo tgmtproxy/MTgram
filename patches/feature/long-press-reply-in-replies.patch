@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Wed, 22 Apr 2026 09:01:03 +0300
+Subject: Long-press reply panel in "Replies" chat opens discussion group instead of thread
+
+---
+ .../src/main/java/org/telegram/ui/ChatActivity.java         | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -40113,7 +40113,11 @@ public class ChatActivity extends BaseFragment implements
+                 }
+             }
+             if (UserObject.isReplyUser(currentUser)) {
+-                didPressSideButton(cell);
++                if (longpress) {
++                    openOriginalReplyChat(cell.getMessageObject());
++                } else {
++                    didPressSideButton(cell);
++                }
+                 return;
+             }
+             MessageObject messageObject = cell.getMessageObject();

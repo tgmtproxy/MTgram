@@ -1,0 +1,412 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 8 May 2026 13:52:58 +0200
+Subject: translator-related features
+
+---
+ .../org/telegram/messenger/MessageObject.java |  3 +-
+ .../messenger/TranslateController.java        |  7 +--
+ .../java/org/telegram/ui/ArticleViewer.java   | 21 ++++++---
+ .../telegram/ui/Cells/ChatMessageCell.java    | 34 +++++++++++---
+ .../ui/Cells/TextSelectionHelper.java         |  1 +
+ .../java/org/telegram/ui/ChatActivity.java    | 45 ++++++++++++-------
+ .../org/telegram/ui/web/WebActionBar.java     |  3 ++
+ 7 files changed, 85 insertions(+), 29 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+@@ -3663,6 +3663,7 @@ public class MessageObject {
+             generateCaption();
+             return replyUpdated || true;
+         } else if (
++            desu.inugram.helpers.translate.TranslateHelper.isManualTranslated(this) && messageOwner != null && (translatedText != null || messageOwner.translatedPoll != null) ||
+             messageOwner != null &&
+             TranslateController.isTranslatable(this) &&
+             translateController.isTranslatingDialog(getDialogId()) &&
+@@ -7076,7 +7077,7 @@ public class MessageObject {
+         }
+         if (linkDescription == null) {
+             if (getMedia(messageOwner) instanceof TLRPC.TL_messageMediaWebPage && getMedia(messageOwner).webpage instanceof TLRPC.TL_webPage && getMedia(messageOwner).webpage.description != null) {
+-                linkDescription = Spannable.Factory.getInstance().newSpannable(getMedia(messageOwner).webpage.description);
++                linkDescription = Spannable.Factory.getInstance().newSpannable(desu.inugram.helpers.translate.TranslateHelper.viewWebPage(this, (TLRPC.TL_webPage) getMedia(messageOwner).webpage).description);
+                 String siteName = getMedia(messageOwner).webpage.site_name;
+                 if (siteName != null) {
+                     siteName = siteName.toLowerCase();
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/TranslateController.java b/TMessagesProj/src/main/java/org/telegram/messenger/TranslateController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/TranslateController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/TranslateController.java
+@@ -37,6 +37,7 @@ import org.telegram.ui.Components.TranslateAlert2;
+ import org.telegram.ui.LaunchActivity;
+ import org.telegram.ui.PremiumPreviewFragment;
+ import org.telegram.ui.RestrictedLanguagesSelectActivity;
++import desu.inugram.helpers.translate.TranslateHelper;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
+@@ -969,7 +970,7 @@ public class TranslateController extends BaseController {
+         int reqId = -1;
+     }
+ 
+-    private void pushToTranslate(
++    public void pushToTranslate(
+         MessageObject message,
+         String language,
+         Utilities.Callback4<Boolean, Integer, TLRPC.TL_textWithEntities, String> callback
+@@ -1439,7 +1440,7 @@ public class TranslateController extends BaseController {
+                 (messageObject.messageOwner.voiceTranscriptionOpen && messageObject.messageOwner.voiceTranscriptionFinal ?
+                     loadingTranscriptionTranslations : loadingTranslations
+                 ).contains(messageObject.getId()) &&
+-                isTranslatingDialog(messageObject.getDialogId())
++                (isTranslatingDialog(messageObject.getDialogId()) || TranslateHelper.isManualTranslated(messageObject))
+             );
+         }
+     }
+@@ -1448,7 +1449,7 @@ public class TranslateController extends BaseController {
+         if (messageObject == null) {
+             return false;
+         }
+-        if (!isTranslatingDialog(messageObject.getDialogId())) {
++        if (!isTranslatingDialog(messageObject.getDialogId()) && !TranslateHelper.isManualTranslated(messageObject, group)) {
+             return false;
+         }
+         final boolean isTranscription = messageObject.messageOwner != null && messageObject.messageOwner.voiceTranscriptionOpen && messageObject.messageOwner.voiceTranscriptionFinal;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java b/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
+@@ -274,7 +274,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+     private boolean collapsed;
+     private boolean attachedToWindow;
+ 
+-    private int currentAccount;
++    public int currentAccount;
+ 
+     private int lastBlockNum = 1;
+ 
+@@ -298,7 +298,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+     private WindowManager.LayoutParams windowLayoutParams;
+     private WindowView windowView;
+     private FrameLayout containerView;
+-    private WebActionBar actionBar;
++    public WebActionBar actionBar;
+     private AddressBarList addressBarList;
+ //    private FrameLayout headerView;
+ //    private SimpleTextView titleTextView;
+@@ -1874,6 +1874,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+             pages[index].setType(PageLayout.TYPE_ARTICLE);
+             adapter.isRtl = webPage.cached_page.rtl;
+             adapter.currentPage = webPage;
++            desu.inugram.helpers.translate.InstantViewHelper.onPageOpened(this, webPage);
+ 
+             int numBlocks = 0;
+             int count = webPage.cached_page.blocks.size();
+@@ -2612,6 +2613,10 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+         if (richText == null) {
+             return null;
+         }
++        if (richText == parentRichText) {
++            CharSequence inu_cached = desu.inugram.helpers.translate.InstantViewHelper.lookupRich(this, richText);
++            if (inu_cached != null) return inu_cached;
++        }
+         if (richText instanceof TLRPC.TL_textFixed) {
+             return getText(page, parentView, parentRichText, ((TLRPC.TL_textFixed) richText).text, parentBlock, maxWidth);
+         } else if (richText instanceof TLRPC.TL_textItalic) {
+@@ -3096,7 +3101,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+ 
+         CharSequence text;
+         if (plainText != null) {
+-            text = plainText;
++            text = desu.inugram.helpers.translate.InstantViewHelper.translate(this, plainText);
+         } else {
+             text = getText(parentAdapter, parentView, richText, richText, parentBlock, width);
+         }
+@@ -3975,6 +3980,10 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+         headerProgressPaint.setColor(0xff242426);
+         navigationBarPaint.setColor(Color.BLACK);
+         actionBar = new WebActionBar(activity, getResourcesProvider()) {
++            @Override
++            protected ArticleViewer inu_getOwnerArticleViewer() {
++                return ArticleViewer.this;
++            }
+             @Override
+             protected void onOpenedMenu() {
+                 pages[0].listView.stopScroll();
+@@ -4421,6 +4430,8 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+             if (id == WebActionBar.search_item) {
+                 actionBar.setHeight(currentHeaderHeight = dp(56));
+                 actionBar.showSearch(true, true);
++            } else if (id == desu.inugram.helpers.translate.InstantViewHelper.MENU_ITEM_ID) {
++                desu.inugram.helpers.translate.InstantViewHelper.onClick(this);
+             } else if (id == WebActionBar.share_item) {
+                 String url;
+                 if (pages[0].isWeb()) {
+@@ -5924,7 +5935,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+ 
+     private LongSparseArray<BlockVideoCellState> videoStates = new LongSparseArray<>();
+ 
+-    private class WebpageAdapter extends RecyclerListView.SelectionAdapter {
++    public class WebpageAdapter extends RecyclerListView.SelectionAdapter {
+ 
+         private Context context;
+         private ArrayList<TLRPC.PageBlock> localBlocks = new ArrayList<>();
+@@ -5939,7 +5950,7 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+         private ArrayList<Object> textBlocks = new ArrayList<>();
+         private HashMap<String, Integer> searchTextOffset = new HashMap<>();
+ 
+-        private TLRPC.WebPage currentPage;
++        public TLRPC.WebPage currentPage;
+         private TLRPC.TL_pageBlockChannel channelBlock;
+         private boolean isRtl;
+         private final boolean padding;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+@@ -1025,6 +1025,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+     public int textX;
+     private int unmovedTextX;
+     private int linkPreviewY;
++    private float inu_capturedPhotoY = Float.NaN;
++    private org.telegram.ui.Components.AnimatedFloat inu_photoYReflowAF;
+     private int factCheckY;
+     public int textY;
+     public int totalHeight;
+@@ -7723,7 +7725,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                         isSmallImage = false;
+                         linkPreviewAbove = currentMessageObject.messageOwner != null && currentMessageObject.messageOwner.invert_media;
+                     } else if (hasLinkPreview) {
+-                        TLRPC.TL_webPage webPage = (TLRPC.TL_webPage) webpage;
++                        TLRPC.TL_webPage webPage = desu.inugram.helpers.translate.TranslateHelper.viewWebPage(messageObject, (TLRPC.TL_webPage) webpage);
+                         site_name = webPage.site_name;
+                         title = drawInstantViewType != 6 && drawInstantViewType != 7 ? webPage.title : null;
+                         if (instantViewTypeIsGiftAuction != null) {
+@@ -12271,6 +12273,27 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+         }
+     }
+ 
++    public void inu_capturePhotoYBeforeReflow() {
++        if (drawPhotoImage && (hasLinkPreview || hasGamePreview || hasInvoicePreview) && photoImage != null) {
++            inu_capturedPhotoY = photoImage.getImageY();
++        }
++    }
++
++    private float inu_applyPhotoYReflow(float newY) {
++        if (!Float.isNaN(inu_capturedPhotoY)) {
++            if (inu_photoYReflowAF == null) {
++                inu_photoYReflowAF = new org.telegram.ui.Components.AnimatedFloat(0, this, 0, androidx.recyclerview.widget.ChatListItemAnimator.DEFAULT_DURATION, androidx.recyclerview.widget.ChatListItemAnimator.DEFAULT_INTERPOLATOR);
++            }
++            float delta = inu_capturedPhotoY - newY;
++            inu_capturedPhotoY = Float.NaN;
++            if (Math.abs(delta) > 0.5f) {
++                inu_photoYReflowAF.force(delta);
++            }
++        }
++        if (inu_photoYReflowAF == null) return newY;
++        return newY + inu_photoYReflowAF.set(0);
++    }
++
+     @Override
+     public void invalidate() {
+         if (currentMessageObject == null) {
+@@ -15303,7 +15326,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+             restore = true;
+ 
+             AndroidUtilities.rectTmp.set(linkX, linkPreviewY - dp(6), linkX + width, linkPreviewY + linkPreviewHeight + (drawInstantButtonInside && drawInstantView ? dp(42) : 0));
+-            linkLine.setLoading(loading);
++            linkLine.setLoading(loading || desu.inugram.helpers.translate.TranslateHelper.isWebPageTranslating(currentMessageObject));
+             float rad = (float) Math.floor(SharedConfig.bubbleRadius / (currentMessageObject.isSponsored() ? 2f : 3f));
+             linkLine
+                 .offsetEmoji(0, drawPhotoImageBefore ? (1f - isSmallImage()) * (dp(18) + photoImage.getImageHeight() + (siteNameLayout != null ? siteNameLayout.getLineBottom(siteNameLayout.getLineCount() - 1) : 0)) : 0)
+@@ -15678,7 +15701,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                 photoImage.setImageY(smallImageStartY);
+             } else {
+                 photoImage.setImageX(linkX + (hasInvoicePreview ? -dp(6.3f) : dp(10)));
+-                photoImage.setImageY(linkPreviewY);
++                photoImage.setImageY(inu_applyPhotoYReflow(linkPreviewY));
+             }
+             if (transitionParams != null && transitionParams.animateSmallImage) {
+                 if (!isSmallImage && documentAttachType != DOCUMENT_ATTACH_TYPE_DOCUMENT) {
+@@ -16678,7 +16701,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+ 
+         final TranslateController translateController = MessagesController.getInstance(currentAccount).getTranslateController();
+         final boolean translating = translateController.isTranslating(currentMessageObject);
+-        final boolean shouldTranslate = currentMessageObject != null && TranslateController.isTranslatable(currentMessageObject) && translateController.isTranslatingDialog(currentMessageObject.getDialogId());
++        final boolean shouldTranslate = currentMessageObject != null && (TranslateController.isTranslatable(currentMessageObject) && translateController.isTranslatingDialog(currentMessageObject.getDialogId()) || desu.inugram.helpers.translate.TranslateHelper.isManualTranslated(currentMessageObject, currentMessagesGroup));
+         final boolean shouldSummarize = currentMessageObject != null && currentMessageObject.messageOwner.summarizedOpen;
+         final boolean isFinal = shouldTranslate == (currentMessageObject != null && currentMessageObject.translated) && shouldSummarize == (currentMessageObject != null && currentMessageObject.summarized);
+         if (origin == !isFinal) {
+@@ -18408,7 +18431,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                 currentTimeString = TextUtils.concat(formatString(R.string.MessageScheduledRepeatSeconds, period), ", ", currentTimeString);
+             }
+         }
+-        timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString == null ? 0 : currentTimeString.length()));
++        currentTimeString = desu.inugram.helpers.translate.TranslateHelper.translatedTimePrefix(currentMessageObject, currentTimeString);
++        timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString == null ? 0 : currentTimeString.length())) + desu.inugram.helpers.translate.TranslateHelper.extraTimeWidth(currentMessageObject);
+         if (currentMessageObject.scheduled && currentMessageObject.messageOwner.date == 0x7FFFFFFE || currentMessageObject.notime) {
+             timeWidth -= dp(8);
+         }
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/TextSelectionHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/TextSelectionHelper.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/TextSelectionHelper.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/TextSelectionHelper.java
+@@ -310,6 +310,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
+         touchSlop = ViewConfiguration.get(ApplicationLoader.applicationContext).getScaledTouchSlop();
+         selectionPaint.setPathEffect(new CornerPathEffect(cornerRadius = dp(6)));
+         selectionPath.setRectsUnionDiffDelta(1f);
++        desu.inugram.helpers.translate.TranslateHelper.installSelectionTranslate(this);
+     }
+ 
+     public void setInvalidateParent() {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -11024,7 +11024,7 @@ public class ChatActivity extends BaseFragment implements
+         if (translateItem == null) {
+             return;
+         }
+-        translateItem.setVisibility(getMessagesController().getTranslateController().isTranslateDialogHidden(getDialogId()) && getMessagesController().getTranslateController().isDialogTranslatable(getDialogId()) ? View.VISIBLE : View.GONE);
++        translateItem.setVisibility(getMessagesController().getTranslateController().isTranslateDialogHidden(getDialogId()) /* && getMessagesController().getTranslateController().isDialogTranslatable(getDialogId()) */ ? View.VISIBLE : View.GONE);
+     }
+ 
+     private Animator infoTopViewAnimator;
+@@ -24241,6 +24241,10 @@ public class ChatActivity extends BaseFragment implements
+     }
+ 
+     private void saveGeneralScroll() {
++        if (chatListView != null && chatLayoutManager != null && forwardEndReached[0] && !chatListView.canScrollVertically(1)) {
++            chatLayoutManager.scrollToPositionWithOffset(0, 0);
++            return;
++        }
+         int scrollByCellHeight = 0;
+         ChatMessageCell scrollByCell = null;
+         for (int i = 0; i < chatListView.getChildCount(); ++i) {
+@@ -24295,16 +24299,19 @@ public class ChatActivity extends BaseFragment implements
+                 boolean update = false;
+                 if (cellMessageObject.getId() == messageObject.getId()) {
+                     cellMessageObject.messageOwner.translatedText = messageObject.messageOwner.translatedText;
++                    cellMessageObject.messageOwner.translatedVoiceTranscription = messageObject.messageOwner.translatedVoiceTranscription;
++                    cellMessageObject.messageOwner.translatedPoll = messageObject.messageOwner.translatedPoll;
+                     cellMessageObject.messageOwner.translatedToLanguage = messageObject.messageOwner.translatedToLanguage;
++                    cellMessageObject.messageOwner.originalLanguage = messageObject.messageOwner.originalLanguage;
+                     cellMessageObject.messageOwner.summaryText = messageObject.messageOwner.summaryText;
+                     cellMessageObject.messageOwner.translatedSummaryText = messageObject.messageOwner.translatedSummaryText;
+                     cellMessageObject.messageOwner.translatedSummaryLanguage = messageObject.messageOwner.translatedSummaryLanguage;
+-                    if (cellMessageObject.updateTranslation(false)) {
+-                        update = true;
+-                        ArrayList<Integer> dependentMessages = replyMessageOwners.get(cellMessageObject.getId());
+-                        if (dependentMessages != null) {
+-                            updateMessagesReplyTranslation(dependentMessages, messageObject);
+-                        }
++                    cellMessageObject.linkDescription = null;
++                    cellMessageObject.updateTranslation(false);
++                    update = true;
++                    ArrayList<Integer> dependentMessages = replyMessageOwners.get(cellMessageObject.getId());
++                    if (dependentMessages != null) {
++                        updateMessagesReplyTranslation(dependentMessages, messageObject);
+                     }
+                 }
+                 MessageObject.GroupedMessages group = groupedMessagesMap.get(messageObject.getGroupId());
+@@ -24333,6 +24340,7 @@ public class ChatActivity extends BaseFragment implements
+                         saveGeneralScroll();
+                     }
+                     cellMessageObject.forceUpdate = true;
++                    cell.inu_capturePhotoYBeforeReflow();
+                     cell.setMessageObject(cellMessageObject, cell.getCurrentMessagesGroup(), cell.isPinnedBottom(), cell.isPinnedTop(), cell.isFirstInChat(), cell.isLastInChatList());
+                     if (group != null) {
+                         if (chatListItemAnimator != null) {
+@@ -31379,10 +31387,9 @@ public class ChatActivity extends BaseFragment implements
+                             waitForLangDetection.set(false);
+                             String fromLang = selectedObject.messageOwner.originalLanguage;
+                             cell.setVisibility(
+-                                fromLang != null && (!fromLang.equals(toLang) || !fromLang.equals(toLangDefault) || fromLang.equals(TranslateController.UNKNOWN_LANGUAGE)) && (
+-                                    translateEnabled && !RestrictedLanguagesSelectActivity.getRestrictedLanguages().contains(fromLang) ||
+-                                    (currentChat != null && (currentChat.has_link || ChatObject.isPublic(currentChat)) || selectedObject.messageOwner.fwd_from != null) && ("uk".equals(fromLang) || "ru".equals(fromLang))
+-                                ) ? View.VISIBLE : View.GONE
++                                fromLang != null && (!fromLang.equals(toLang) || !fromLang.equals(toLangDefault) || fromLang.equals(TranslateController.UNKNOWN_LANGUAGE)) &&
++                                    translateEnabled && !RestrictedLanguagesSelectActivity.getRestrictedLanguages().contains(fromLang)
++                                ? View.VISIBLE : View.GONE
+                             );
+                             cell.setOnClickListener(e -> {
+                                 if (selectedObject == null || i >= options.size() || getParentActivity() == null) {
+@@ -31391,8 +31398,10 @@ public class ChatActivity extends BaseFragment implements
+ 
+                                 String toLangValue = fromLang != null && fromLang.equals(toLang) ? toLangDefault : toLang;
+                                 ArrayList<TLRPC.MessageEntity> entities = selectedObject != null && selectedObject.messageOwner != null ? selectedObject.messageOwner.entities : null;
++                                if (!desu.inugram.helpers.translate.TranslateHelper.startTranslate(this, selectedObject, selectedObjectGroup, fromLang, toLangValue)) {
+                                 TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang, toLangValue, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                 alert.setDimBehind(false);
++                                }
+                                 closeMenu(false);
+                                 
+ //                                final TranslateAlert3 alert =
+@@ -31422,10 +31431,9 @@ public class ChatActivity extends BaseFragment implements
+                                 finalMessageText.toString(),
+                                 (String lang) -> {
+                                     fromLang[0] = lang;
+-                                    if (fromLang[0] != null && (!fromLang[0].equals(toLang) || !fromLang[0].equals(toLangDefault) || fromLang[0].equals(TranslateController.UNKNOWN_LANGUAGE)) && (
+-                                        translateEnabled && !RestrictedLanguagesSelectActivity.getRestrictedLanguages().contains(fromLang[0]) ||
+-                                        (currentChat != null && (currentChat.has_link || ChatObject.isPublic(currentChat)) || selectedObject.messageOwner.fwd_from != null) && ("uk".equals(fromLang[0]) || "ru".equals(fromLang[0]))
+-                                    )) {
++                                    if (fromLang[0] != null && (!fromLang[0].equals(toLang) || !fromLang[0].equals(toLangDefault) || fromLang[0].equals(TranslateController.UNKNOWN_LANGUAGE)) &&
++                                        translateEnabled && !RestrictedLanguagesSelectActivity.getRestrictedLanguages().contains(fromLang[0])
++                                    ) {
+                                         cell.setVisibility(View.VISIBLE);
+                                     }
+                                     waitForLangDetection.set(false);
+@@ -31449,8 +31457,10 @@ public class ChatActivity extends BaseFragment implements
+                                 }
+                                 String toLangValue = fromLang[0] != null && fromLang[0].equals(toLang) ? toLangDefault : toLang;
+                                 ArrayList<TLRPC.MessageEntity> entities = selectedObject != null && selectedObject.messageOwner != null ? selectedObject.messageOwner.entities : null;
++                                if (!desu.inugram.helpers.translate.TranslateHelper.startTranslate(this, selectedObject, selectedObjectGroup, fromLang[0], toLangValue)) {
+                                 TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, fromLang[0], toLangValue, finalMessageText, entities, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                 alert.setDimBehind(false);
++                                }
+                                 closeMenu(false);
+ 
+ //                                final TranslateAlert3 alert =
+@@ -31483,8 +31493,10 @@ public class ChatActivity extends BaseFragment implements
+                                     return;
+                                 }
+ 
++                                if (!desu.inugram.helpers.translate.TranslateHelper.startTranslate(this, selectedObject, selectedObjectGroup, "und", toLang)) {
+                                 TranslateAlert2 alert = TranslateAlert2.showAlert(getParentActivity(), this, currentAccount, inputPeer, messageIdToTranslate[0], selectedObject.summarized, "und", toLang, finalMessageText, null, noforwardsOrPaidMedia, onLinkPress, () -> dimBehindView(false));
+                                 alert.setDimBehind(false);
++                                }
+                                 closeMenu(false);
+ 
+ //                                final TranslateAlert3 alert = new TranslateAlert3(getContext(), getResourceProvider())
+@@ -31507,6 +31519,9 @@ public class ChatActivity extends BaseFragment implements
+                         } else {
+                             cell.setVisibility(View.GONE);
+                         }
++                        if (desu.inugram.helpers.translate.TranslateHelper.hasTranslatableWebPage(selectedObject)) {
++                            cell.setVisibility(View.VISIBLE);
++                        }
+                     }
+                 }
+                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.video_processing_pending) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/web/WebActionBar.java b/TMessagesProj/src/main/java/org/telegram/ui/web/WebActionBar.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/web/WebActionBar.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/web/WebActionBar.java
+@@ -129,6 +129,8 @@ public class WebActionBar extends FrameLayout {
+     public static final int forward_item = 9;
+     public static final int instant_item = 10;
+ 
++    protected ArticleViewer inu_getOwnerArticleViewer() { return null; }
++
+     public WebActionBar(Context context, Theme.ResourcesProvider resourcesProvider) {
+         super(context);
+         this.resourcesProvider = resourcesProvider;
+@@ -217,6 +219,7 @@ public class WebActionBar extends FrameLayout {
+                 o.add(R.drawable.msg_openin, getString(R.string.OpenInExternalApp), click.run(open_item));
+                 o.add(R.drawable.msg_search, getString(R.string.Search), click.run(search_item));
+                 o.addIf(!isLocal, R.drawable.msg_share, getString(R.string.ShareFile), click.run(share_item));
++                desu.inugram.helpers.translate.InstantViewHelper.addMenuItem(o, click.run(desu.inugram.helpers.translate.InstantViewHelper.MENU_ITEM_ID), inu_getOwnerArticleViewer());
+                 o.add(R.drawable.msg_settings_old, getString(R.string.Settings), click.run(settings_item));
+             } else if (menuType == ArticleViewer.PageLayout.TYPE_WEB) {
+                 if (!isTonsite) {

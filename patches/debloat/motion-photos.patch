@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Wed, 22 Apr 2026 08:10:29 +0300
+Subject: disable "motion photos" throughout the app, both sending and rendering
+
+---
+ .../src/main/java/org/telegram/messenger/MediaController.java | 1 +
+ .../src/main/java/org/telegram/messenger/MessageObject.java   | 4 ++++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MediaController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MediaController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MediaController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MediaController.java
+@@ -616,6 +616,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
+         @Override
+         public boolean isLivePhoto() {
+             if (isVideo || parsedXmp) return isLivePhoto;
++            if (desu.inugram.InuConfig.DISABLE_MOTION_PHOTOS.getValue()) return false;
+             parsedXmp = true;
+             final long start = System.currentTimeMillis();
+             try {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+@@ -10110,6 +10110,9 @@ public class MessageObject {
+         if (getMedia(message) instanceof TLRPC.TL_messageMediaWebPage) {
+             return isVideoDocument(getMedia(message).webpage.document);
+         }
++        if (getMedia(message) instanceof TLRPC.TL_messageMediaPhoto && getMedia(message).live_photo && desu.inugram.InuConfig.DISABLE_MOTION_PHOTOS.getValue()) {
++            return false;
++        }
+         return getMedia(message) != null && isVideoDocument(getMedia(message).document);
+     }
+ 
+@@ -10653,6 +10656,7 @@ public class MessageObject {
+     }
+ 
+     public boolean isLivePhoto() {
++        if (desu.inugram.InuConfig.DISABLE_MOTION_PHOTOS.getValue()) return false;
+         final TLRPC.MessageMedia media = getMedia(this);
+         return media != null && media.live_photo;
+     }

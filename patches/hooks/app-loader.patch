@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 27 Apr 2026 09:46:28 +0300
+Subject: hook for android to use our own ApplicationLoaderImpl instead of stock
+
+---
+ TMessagesProj_App/src/main/AndroidManifest.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/TMessagesProj_App/src/main/AndroidManifest.xml b/TMessagesProj_App/src/main/AndroidManifest.xml
+index 0000000..0000000 100644
+--- a/TMessagesProj_App/src/main/AndroidManifest.xml
++++ b/TMessagesProj_App/src/main/AndroidManifest.xml
+@@ -3,7 +3,7 @@
+     xmlns:tools="http://schemas.android.com/tools"
+     android:installLocation="auto">
+ 
+-    <application android:name="org.telegram.messenger.ApplicationLoaderImpl" tools:replace="name">
++    <application android:name="desu.inugram.ApplicationLoaderImpl" tools:replace="name">
+         <service
+             android:name="org.telegram.messenger.GoogleVoiceClientService"
+             android:exported="true"

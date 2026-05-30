@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 02:42:11 +0300
+Subject: disable local sensitive filtering
+
+---
+ .../src/main/java/org/telegram/messenger/MessageObject.java     | 1 +
+ .../main/java/org/telegram/messenger/MessagesController.java    | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+@@ -634,6 +634,7 @@ public class MessageObject {
+ 
+     public Boolean isSensitiveCached;
+     public boolean isSensitive() {
++        if (desu.inugram.InuConfig.DISABLE_SENSITIVE.getValue()) return false;
+         if (isSensitiveCached != null) return isSensitiveCached;
+         if (messageOwner == null) return false;
+         if (!canBeSensitive()) return false;
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+@@ -21567,6 +21567,7 @@ public class MessagesController extends BaseController implements NotificationCe
+     }
+ 
+     public String getRestrictionReason(ArrayList<TLRPC.RestrictionReason> reasons) {
++        if (desu.inugram.InuConfig.DISABLE_SENSITIVE.getValue()) return null;
+         if (reasons.isEmpty()) {
+             return null;
+         }
+@@ -21586,6 +21587,7 @@ public class MessagesController extends BaseController implements NotificationCe
+     }
+ 
+     public boolean isSensitive(ArrayList<TLRPC.RestrictionReason> reasons) {
++        if (desu.inugram.InuConfig.DISABLE_SENSITIVE.getValue()) return false;
+         if (reasons == null || reasons.isEmpty()) {
+             return false;
+         }

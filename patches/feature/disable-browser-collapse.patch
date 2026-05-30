@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 26 May 2026 22:16:40 +0400
+Subject: disable swipe-to-collapse in the in-app browser.
+
+---
+ TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java b/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ArticleViewer.java
+@@ -13604,6 +13604,9 @@ public class ArticleViewer implements NotificationCenter.NotificationCenterDeleg
+             });
+             swipeContainer.setTopActionBarOffsetY(dp(sheet != null && !sheet.halfSize() ? 0 : 56) + AndroidUtilities.statusBarHeight);
+ //            swipeContainer.setIsKeyboardVisible(obj -> windowView.getKeyboardHeight() >= dp(20));
++            if (desu.inugram.InuConfig.DISABLE_BROWSER_SWIPE_COLLAPSE.getValue()) {
++                swipeContainer.setAllowSwipes(false);
++            }
+             addView(swipeContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+ 
+             cleanup();

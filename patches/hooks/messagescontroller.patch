@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Wed, 6 May 2026 23:19:43 +0200
+Subject: hook to access MessageController instances as they are created
+
+---
+ .../src/main/java/org/telegram/messenger/MessagesController.java | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+@@ -1471,6 +1471,7 @@ public class MessagesController extends BaseController implements NotificationCe
+                 localInstance = Instance[num];
+                 if (localInstance == null) {
+                     Instance[num] = localInstance = new MessagesController(num);
++                    desu.inugram.InuHooks.onMessagesControllerCreated(localInstance, num);
+                 }
+             }
+         }

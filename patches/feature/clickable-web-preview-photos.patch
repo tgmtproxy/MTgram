@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 21 May 2026 23:00:51 +0400
+Subject: click to open photos in webpage preview
+
+---
+ .../src/main/java/org/telegram/messenger/FileLoader.java      | 4 ++--
+ .../src/main/java/org/telegram/ui/Cells/ChatMessageCell.java  | 4 ++++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/FileLoader.java b/TMessagesProj/src/main/java/org/telegram/messenger/FileLoader.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/FileLoader.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/FileLoader.java
+@@ -1249,7 +1249,7 @@ public class FileLoader extends BaseController {
+                 } else if (MessageObject.getMedia(message).webpage.photo != null) {
+                     ArrayList<TLRPC.PhotoSize> sizes = MessageObject.getMedia(message).webpage.photo.sizes;
+                     if (sizes.size() > 0) {
+-                        TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize());
++                        TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize(true), false, null, true);
+                         if (sizeFull != null) {
+                             return getAttachFileName(sizeFull);
+                         }
+@@ -1304,7 +1304,7 @@ public class FileLoader extends BaseController {
+                 } else if (MessageObject.getMedia(message).webpage.photo != null) {
+                     ArrayList<TLRPC.PhotoSize> sizes = MessageObject.getMedia(message).webpage.photo.sizes;
+                     if (sizes.size() > 0) {
+-                        TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize());
++                        TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize(true), false, null, true);
+                         if (sizeFull != null) {
+                             return getPathToAttach(sizeFull, null, forceCache, useFileDatabaseQueue);
+                         }
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+@@ -3129,6 +3129,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                         } else {
+                             MediaController.getInstance().pauseMessage(currentMessageObject);
+                         }
++                    } else if (drawPhotoImage && documentAttachType == DOCUMENT_ATTACH_TYPE_NONE && photoImage.isInsideImage(lastTouchX, lastTouchY) && currentMessageObject != null && !currentMessageObject.preview && MessageObject.getMedia(currentMessageObject.messageOwner).webpage != null && TextUtils.isEmpty(MessageObject.getMedia(currentMessageObject.messageOwner).webpage.embed_url)) {
++                        if (delegate != null) {
++                            delegate.didPressImage(this, lastTouchX, lastTouchY, false);
++                        }
+                     } else if (drawInstantView || currentMessageObject != null && currentMessageObject.currentEvent != null && currentMessageObject.currentEvent.action instanceof TLRPC.TL_channelAdminLogEventActionEditMessage) {
+                         if (delegate != null) {
+                             delegate.didPressInstantButton(this, drawInstantViewType);

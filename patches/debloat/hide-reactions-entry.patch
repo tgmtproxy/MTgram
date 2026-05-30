@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 17 Apr 2026 04:44:17 +0300
+Subject: hide animation when sending a reaction
+
+---
+ .../ui/Components/Reactions/ReactionsLayoutInBubble.java         | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/Reactions/ReactionsLayoutInBubble.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/Reactions/ReactionsLayoutInBubble.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/Reactions/ReactionsLayoutInBubble.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/Reactions/ReactionsLayoutInBubble.java
+@@ -1626,6 +1626,7 @@ public class ReactionsLayoutInBubble {
+     }
+ 
+     public void animateReaction(VisibleReaction reaction) {
++        if (desu.inugram.InuConfig.HIDE_REACTIONS_ENTRY.getValue()) return;
+         if (reaction.documentId == 0 && animatedReactions.get(reaction) == null) {
+             ImageReceiver imageReceiver = new ImageReceiver();
+             imageReceiver.setParentView(parentView);

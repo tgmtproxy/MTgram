@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Sun, 19 Apr 2026 10:05:04 +0300
+Subject: disable per-chat backgrounds and themes
+
+---
+ .../java/org/telegram/messenger/ChatThemeController.java     | 2 ++
+ .../src/main/java/org/telegram/ui/ChatActivity.java          | 5 +++++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/ChatThemeController.java b/TMessagesProj/src/main/java/org/telegram/messenger/ChatThemeController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/ChatThemeController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/ChatThemeController.java
+@@ -326,6 +326,7 @@ public class ChatThemeController extends BaseController {
+     }
+ 
+     public EmojiThemes getDialogTheme(long dialogId) {
++        if (desu.inugram.helpers.chat.ChatHelper.shouldRemoveTheme(currentAccount, dialogId)) return null;
+         ThemeKey themeKey = dialogEmoticonsMap.get(dialogId);
+         if (themeKey == null) {
+             themeKey = ThemeKey.fromSavedString(getEmojiSharedPreferences().getString("chatTheme_" + currentAccount + "_" + dialogId, null));
+@@ -368,6 +369,7 @@ public class ChatThemeController extends BaseController {
+     }
+ 
+     public TLRPC.WallPaper getDialogWallpaper(long dialogId) {
++        if (desu.inugram.helpers.chat.ChatHelper.shouldRemoveWallpaper(currentAccount, dialogId)) return null;
+         if (dialogId >= 0) {
+             TLRPC.UserFull userFull = getMessagesController().getUserFull(dialogId);
+             if (userFull != null) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -42448,6 +42448,11 @@ public class ChatActivity extends BaseFragment implements
+         if (themeDelegate == null || parentThemeDelegate != null) {
+             return;
+         }
++        if (desu.inugram.helpers.chat.ChatHelper.shouldRemoveTheme(currentAccount, dialog_id)) {
++            TLRPC.WallPaper wallPaper = ChatThemeController.getInstance(currentAccount).getDialogWallpaper(dialog_id);
++            themeDelegate.setCurrentTheme(null, wallPaper, openAnimationStartTime != 0, null);
++            return;
++        }
+         ThemeKey key = ThemeKey.of(theme);
+         ChatThemeController chatThemeController = ChatThemeController.getInstance(currentAccount);
+         chatThemeController.setDialogTheme(dialog_id, theme, false);

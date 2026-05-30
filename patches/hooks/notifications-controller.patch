@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 25 May 2026 19:59:57 +0400
+Subject: hooks inside NotificationsController
+
+---
+ .../org/telegram/messenger/NotificationsController.java   | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+@@ -95,7 +95,7 @@ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
+ import java.util.concurrent.CountDownLatch;
+-import java.util.function.Consumer;
++import java.util.function.Consumer;import desu.inugram.helpers.NotificationsHelper;
+ 
+ public class NotificationsController extends BaseController {
+ 
+@@ -4049,7 +4049,7 @@ public class NotificationsController extends BaseController {
+     }
+ 
+     private void showOrUpdateNotification(boolean notifyAboutLast) {
+-        if (!getUserConfig().isClientActivated() || pushMessages.isEmpty() && storyPushMessages.isEmpty() || !SharedConfig.showNotificationsForAllAccounts && currentAccount != UserConfig.selectedAccount) {
++        if (!getUserConfig().isClientActivated() || pushMessages.isEmpty() && storyPushMessages.isEmpty() || NotificationsHelper.shouldSuppressNotifications(currentAccount) || !SharedConfig.showNotificationsForAllAccounts && currentAccount != UserConfig.selectedAccount) {
+             dismissNotification();
+             return;
+         }
+@@ -4533,7 +4533,7 @@ public class NotificationsController extends BaseController {
+             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_ONE_SHOT);
+ 
+             mBuilder.setContentTitle(name)
+-                    .setSmallIcon(R.drawable.notification)
++                    .setSmallIcon(NotificationsHelper.smallIconRes())
+                     .setAutoCancel(true)
+                     .setNumber(total_unread_count)
+                     .setContentIntent(contentIntent)
+@@ -5511,7 +5511,7 @@ public class NotificationsController extends BaseController {
+ 
+             NotificationCompat.Builder builder = new NotificationCompat.Builder(ApplicationLoader.applicationContext)
+                     .setContentTitle(name)
+-                    .setSmallIcon(R.drawable.notification)
++                    .setSmallIcon(NotificationsHelper.smallIconRes())
+                     .setContentText(text.toString())
+                     .setAutoCancel(true)
+                     .setNumber(dialogKey.story ? storyPushMessages.size() : messageObjects.size())

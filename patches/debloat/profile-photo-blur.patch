@@ -1,0 +1,179 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 11 May 2026 20:53:33 +0200
+Subject: disable profile photo blur, replacing it with a simple fade gradient
+
+---
+ .../telegram/ui/Components/ProfileActionsView.java |  2 +-
+ .../ui/Components/ProfileGalleryBlurView.java      |  6 +++++-
+ .../telegram/ui/Components/ProfileGalleryView.java |  2 +-
+ .../telegram/ui/Components/ProfileMusicView.java   |  9 ++++++---
+ .../main/java/org/telegram/ui/ProfileActivity.java | 14 ++++++++------
+ 5 files changed, 21 insertions(+), 12 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileActionsView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileActionsView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileActionsView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileActionsView.java
+@@ -411,7 +411,7 @@ public class ProfileActionsView extends View {
+ 
+         final boolean isButtonColorLight = isButtonColorLight();
+         float useFilledWhiteIcon = !isButtonColorLight ? 1 : MathUtils.clamp((parentExpanded - 0.75f) / 0.25f, 0, 1);
+-        if (isButtonColorLight && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
++        if (isButtonColorLight && (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || desu.inugram.helpers.profile.ProfileHelper.useProfilePhotoGradientFade())) {
+             useFilledWhiteIcon = 0f;
+         }
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryBlurView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryBlurView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryBlurView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryBlurView.java
+@@ -49,6 +49,7 @@ public class ProfileGalleryBlurView extends View {
+     private ProfileGalleryView view;
+     public int actionSize;
+     public int size;
++    public float inu_expandProgress = 0f;
+ 
+     private final Runnable blurTask = this::doBlur;
+     private final Runnable invalidateTask = this::updateContent;
+@@ -422,7 +423,8 @@ public class ProfileGalleryBlurView extends View {
+ 
+     @Override
+     protected void onDraw(Canvas canvas) {
+-        draw(canvas, null, view.getMeasuredWidth(), view.getMeasuredHeight(), false, 0f, 1f);
++        float a = desu.inugram.helpers.profile.ProfileHelper.useProfilePhotoGradientFade() ? inu_expandProgress : 1f;
++        draw(canvas, null, view.getMeasuredWidth(), view.getMeasuredHeight(), false, 0f, a);
+     }
+ 
+     public void draw(Canvas canvas, ProfileActivity.AvatarImageView avatarImageView, float width, float height, boolean translate, float fraction, float alpha) {
+@@ -430,6 +432,8 @@ public class ProfileGalleryBlurView extends View {
+             return;
+         }
+ 
++        if (desu.inugram.helpers.profile.ProfileHelper.drawProfilePhotoGradientFade(canvas, this, width, translate, fraction, alpha)) return;
++
+         if (usingRenderNode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+             if (canvas.isHardwareAccelerated()) {
+                 if (avatarImageView == null && getVisibility() == View.VISIBLE && getAlpha() > 0f) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileGalleryView.java
+@@ -377,7 +377,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
+     public void setAlpha(float alpha) {
+         super.setAlpha(alpha);
+         if (blurView != null) {
+-            blurView.setAlpha(alpha);
++            blurView.setAlpha(desu.inugram.helpers.profile.ProfileHelper.useProfilePhotoGradientFade() ? 1f : alpha);
+         }
+     }
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileMusicView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileMusicView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileMusicView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ProfileMusicView.java
+@@ -92,8 +92,10 @@ public class ProfileMusicView extends View {
+     private float parentExpanded;
+     private int backgroundColor;
+     private boolean withShadows;
++    private MessagesController.PeerColor inu_lastPeerColor;
+ 
+     public void setColor(MessagesController.PeerColor peerColor) {
++        inu_lastPeerColor = peerColor;
+         int color1, color2;
+         if (peerColor == null) {
+             color1 = color2 = Theme.getColor(Theme.key_actionBarDefault, resourcesProvider);
+@@ -109,12 +111,14 @@ public class ProfileMusicView extends View {
+             backgroundColor = Theme.adaptHSV(ColorUtils.blendARGB(color1, color2, .15f), +.04f, -.09f);
+             withShadows = false;
+         }
++        backgroundColor = desu.inugram.helpers.profile.ProfileHelper.blendChipBackgroundForExpand(backgroundColor, Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), parentExpanded);
++        withShadows = withShadows || desu.inugram.helpers.profile.ProfileHelper.forceChipShadowForExpand(parentExpanded);
+         backgroundPaint.setColor(backgroundColor);
+         checkTextColor();
+     }
+ 
+     private void checkTextColor() {
+-        final boolean useBlackText = parentExpanded < 0.8f && AndroidUtilities.computePerceivedBrightness(backgroundColor) > 0.85f;
++        final boolean useBlackText = (parentExpanded < 0.8f || desu.inugram.helpers.profile.ProfileHelper.useProfilePhotoGradientFade()) && AndroidUtilities.computePerceivedBrightness(backgroundColor) > 0.85f;
+         textColor = useBlackText ? Color.BLACK : Color.WHITE;
+         icon.setColorFilter(useBlackText ? filterColorBlack : filterColorWhite);
+         iconPaint.setColor(textColor);
+@@ -125,8 +129,7 @@ public class ProfileMusicView extends View {
+     public void setParentExpanded(float expanded) {
+         if (parentExpanded != expanded) {
+             parentExpanded = expanded;
+-            checkTextColor();
+-            invalidate();
++            setColor(inu_lastPeerColor);
+         }
+     }
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ProfileActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ProfileActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ProfileActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ProfileActivity.java
+@@ -1024,6 +1024,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+             blurSizeFraction = value;
+             this.avatarScale = avatarScale;
+             this.isPulledDown = isPulledDown;
++            ProfileHelper.notifyBlurExpandProgress(avatarsViewPager, value);
+         }
+ 
+         public void setRoundRadiusCollapse(int roundRadiusCollapse) {
+@@ -1126,7 +1127,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+                 }
+             }
+ 
+-            if (shouldDrawBlur) {
++            if (shouldDrawBlur && !ProfileHelper.useProfilePhotoGradientFade()) {
+                 canvas.translate(inset, inset + thisHeight);
+                 float fraction = !isPulledDown && !blurView.isUsingRenderNode() && avatarsViewPager.getRealPosition() != 0 ? 1f : (1f - blurSizeFraction);
+                 blurView.draw(canvas, this, thisWidth - inset * 2f, thisHeight - inset * 2f, true, fraction, alpha);
+@@ -1328,7 +1329,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+             final int color1 = color1Animated.set(this.color1);
+             final int color2 = color2Animated.set(this.color2);
+             if (actionsView != null) {
+-                actionsView.setActionsColor(btnColor, hasColorById);
++                actionsView.setActionsColor(ProfileHelper.adjustChipColor(btnColor, getThemedColor(Theme.key_windowBackgroundWhite), ProfileHelper.effectiveChipExpand(playProfileAnimation, avatarAnimationProgress, currentExpandAnimatorValue)), hasColorById);
+             }
+ 
+             int gradientX = getWidth() / 2;
+@@ -1556,9 +1557,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+             }
+ 
+             topOverlayGradient.draw(canvas);
+-            bottomOverlayGradient.draw(canvas);
++            if (!ProfileHelper.useProfilePhotoGradientFade()) bottomOverlayGradient.draw(canvas);
+             canvas.drawRect(topOverlayRect, backgroundPaint);
+-            canvas.drawRect(bottomOverlayRect, backgroundPaint);
++            if (!ProfileHelper.useProfilePhotoGradientFade()) canvas.drawRect(bottomOverlayRect, backgroundPaint);
+ 
+             int count = avatarsViewPager.getRealCount();
+             selectedPosition = avatarsViewPager.getRealPosition();
+@@ -3128,6 +3129,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+                         if (giftsView != null) {
+                             giftsView.setExpandProgress(1f);
+                         }
++                        desu.inugram.helpers.profile.ProfileHelper.notifyBlurExpandProgress(avatarsViewPager, 1f);
+                         if (actionsView != null) {
+                             actionsView.setParentExpanded(1f);
+                         }
+@@ -11169,7 +11171,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+             actionsView.clipHeight = -1;
+             float bottom = extraHeight + newTop - dp(hasMusic ? 25 : 0);
+             float height = Math.min(dp(74), bottom - newTop);
+-            actionsView.updatePosition(bottom - height, height);
++            actionsView.updatePosition(bottom - height + ProfileHelper.expandedActionsOffset(playProfileAnimation, avatarAnimationProgress, currentExpandAnimatorValue), height);
+         }
+ 
+         if (callToActionItem != null && callToActionItem.getTag() != null) {
+@@ -11199,7 +11201,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
+ //            musicView.clipHeight = -1;
+             float bottom = extraHeight + newTop + dp(74);
+             float height = Math.min(getActionsExtraHeight(), bottom - newTop);
+-            musicView.updatePosition(bottom - height, height - dp(74));
++            musicView.updatePosition(bottom - height + ProfileHelper.expandedActionsOffset(playProfileAnimation, avatarAnimationProgress, currentExpandAnimatorValue), height - dp(74));
+         }
+     }
+ 

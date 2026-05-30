@@ -1,0 +1,329 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Wed, 20 May 2026 22:08:21 +0400
+Subject: paranoia mode (hide chats, accounts, disguise as stock app)
+
+---
+ .../java/org/telegram/messenger/ContactsController.java   | 1 +
+ .../java/org/telegram/messenger/MediaDataController.java  | 2 ++
+ .../java/org/telegram/messenger/MessagesController.java   | 3 +++
+ .../main/java/org/telegram/messenger/MessagesStorage.java | 7 +++++++
+ .../org/telegram/messenger/NotificationsController.java   | 4 ++++
+ .../org/telegram/ui/Adapters/DialogsSearchAdapter.java    | 5 +++++
+ .../org/telegram/ui/Adapters/SearchAdapterHelper.java     | 8 ++++----
+ .../src/main/java/org/telegram/ui/CallLogActivity.java    | 4 ++++
+ .../java/org/telegram/ui/Cells/AppIconsSelectorCell.java  | 1 +
+ .../main/java/org/telegram/ui/Components/ShareAlert.java  | 1 +
+ .../src/main/java/org/telegram/ui/DialogsActivity.java    | 4 ++--
+ .../java/org/telegram/ui/Stories/StoriesController.java   | 1 +
+ 12 files changed, 35 insertions(+), 6 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java b/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/ContactsController.java
+@@ -1623,6 +1623,7 @@ public class ContactsController extends BaseController {
+                     getMessagesStorage().putUsersAndChats(usersArr, null, true, true);
+                     getMessagesStorage().putContacts(contactsArr, from != 2);
+                 }
++                desu.inugram.helpers.security.ParanoiaHelper.filterContacts(currentAccount, contactsArr);
+ 
+                 final Collator collator = getLocaleCollator();
+                 Collections.sort(contactsArr, (tl_contact, tl_contact2) -> {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MediaDataController.java
+@@ -5252,6 +5252,7 @@ public class MediaDataController extends BaseController {
+                         inlineBots = inlineBotsNew;
+                         guestBots = guestsBotsNew;
+                         webapps = webappsNew;
++                        desu.inugram.helpers.security.ParanoiaHelper.filterTopPeers(currentAccount, hints);
+                         buildShortcuts();
+                         getNotificationCenter().postNotificationName(NotificationCenter.reloadHints);
+                         getNotificationCenter().postNotificationName(NotificationCenter.reloadInlineHints);
+@@ -5311,6 +5312,7 @@ public class MediaDataController extends BaseController {
+                         }
+                     }
+                     getUserConfig().saveConfig(false);
++                    desu.inugram.helpers.security.ParanoiaHelper.filterTopPeers(currentAccount, hints);
+                     buildShortcuts();
+                     getNotificationCenter().postNotificationName(NotificationCenter.reloadHints);
+                     getNotificationCenter().postNotificationName(NotificationCenter.reloadInlineHints);
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesController.java
+@@ -21328,6 +21328,7 @@ public class MessagesController extends BaseController implements NotificationCe
+         }
+         for (int a = 0, N = allDialogs.size(); a < N; a++) {
+             TLRPC.Dialog d = allDialogs.get(a);
++            if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, d.id)) continue;
+             if (d instanceof TLRPC.TL_dialog) {
+                 long dialogId = d.id;
+                 if (DialogObject.isEncryptedDialog(dialogId)) {
+@@ -21407,6 +21408,7 @@ public class MessagesController extends BaseController implements NotificationCe
+                 }
+                 for (int a = 0, N = allDialogs.size(); a < N; a++) {
+                     TLRPC.Dialog d = allDialogs.get(a);
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, d.id)) continue;
+                     if (d instanceof TLRPC.TL_dialog) {
+                         long dialogId = d.id;
+                         if (DialogObject.isEncryptedDialog(dialogId)) {
+@@ -21438,6 +21440,7 @@ public class MessagesController extends BaseController implements NotificationCe
+         }
+         for (int a = 0, N = allDialogs.size(); a < N; a++) {
+             TLRPC.Dialog d = allDialogs.get(a);
++            if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, d.id)) continue;
+             if (d instanceof TLRPC.TL_dialog) {
+                 ArrayList<MessageObject> messageObjects = dialogMessage.get(d.id);
+                 if (messageObjects != null) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessagesStorage.java
+@@ -9916,6 +9916,7 @@ public class MessagesStorage extends BaseController {
+                     if (id == -1) {
+                         continue;
+                     }
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, id)) continue;
+                     dids.add(id);
+                     if (users != null && chats != null) {
+                         if (DialogObject.isUserDialog(id)) {
+@@ -10001,6 +10002,7 @@ public class MessagesStorage extends BaseController {
+                     if (id == -1) {
+                         continue;
+                     }
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, id)) continue;
+                     dids.add(id);
+                     if (DialogObject.isUserDialog(id)) {
+                         usersToLoad.add(id);
+@@ -10035,6 +10037,7 @@ public class MessagesStorage extends BaseController {
+                     if (DialogObject.isFolderDialogId(dialogId)) {
+                         continue;
+                     }
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, dialogId)) continue;
+                     if (add) {
+                         dids.add(dialogId);
+                     }
+@@ -17400,6 +17403,7 @@ public class MessagesStorage extends BaseController {
+             }
+             while (cursor.next()) {
+                 long id = cursor.longValue(0);
++                if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, id)) continue;
+                 DialogsSearchAdapter.DialogSearchResult dialogSearchResult = new DialogsSearchAdapter.DialogSearchResult();
+                 dialogSearchResult.date = cursor.intValue(1);
+                 dialogsResult.put(id, dialogSearchResult);
+@@ -17675,6 +17679,9 @@ public class MessagesStorage extends BaseController {
+                 cursor = getDatabase().queryFinalized("SELECT u.data, u.status, u.name, u.uid FROM users as u INNER JOIN contacts as c ON u.uid = c.uid");
+                 while (cursor.next()) {
+                     long uid = cursor.longValue(3);
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, uid)) {
++                        continue;
++                    }
+                     if (dialogsResult.indexOfKey(uid) >= 0) {
+                         continue;
+                     }
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/NotificationsController.java
+@@ -1060,6 +1060,7 @@ public class NotificationsController extends BaseController {
+ 
+             for (int a = 0; a < messageObjects.size(); a++) {
+                 MessageObject messageObject = messageObjects.get(a);
++                if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, messageObject.getDialogId())) continue;
+                 if (messageObject.messageOwner != null && (messageObject.isImportedForward() ||
+                         messageObject.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL ||
+                         messageObject.messageOwner.silent && (messageObject.messageOwner.action instanceof TLRPC.TL_messageActionContactSignUp || messageObject.messageOwner.action instanceof TLRPC.TL_messageActionUserJoined)) ||
+@@ -1375,6 +1376,7 @@ public class NotificationsController extends BaseController {
+             SharedPreferences preferences = getAccountInstance().getNotificationsSettings();
+             for (int b = 0; b < dialogsToUpdate.size(); b++) {
+                 long dialogId = dialogsToUpdate.keyAt(b);
++                if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, dialogId)) continue;
+                 Integer currentCount = pushDialogs.get(dialogId);
+                 int newCount = dialogsToUpdate.get(dialogId);
+                 boolean forum = false;
+@@ -1716,6 +1718,7 @@ public class NotificationsController extends BaseController {
+                             final ArrayList<TLRPC.Dialog> dialogs = new ArrayList<>(MessagesController.getInstance(a).allDialogs);
+                             for (int i = 0, N = dialogs.size(); i < N; i++) {
+                                 TLRPC.Dialog dialog = dialogs.get(i);
++                                if (dialog != null && desu.inugram.helpers.security.ParanoiaHelper.isHidden(a, dialog.id)) continue;
+                                 if (dialog != null && DialogObject.isChatDialog(dialog.id)) {
+                                     TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
+                                     if (ChatObject.isNotInChat(chat)) {
+@@ -1737,6 +1740,7 @@ public class NotificationsController extends BaseController {
+                         try {
+                             for (int i = 0, N = MessagesController.getInstance(a).allDialogs.size(); i < N; i++) {
+                                 TLRPC.Dialog dialog = MessagesController.getInstance(a).allDialogs.get(i);
++                                if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(a, dialog.id)) continue;
+                                 if (DialogObject.isChatDialog(dialog.id)) {
+                                     TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
+                                     if (ChatObject.isNotInChat(chat)) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/DialogsSearchAdapter.java b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/DialogsSearchAdapter.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/DialogsSearchAdapter.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/DialogsSearchAdapter.java
+@@ -284,6 +284,8 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
+     }
+ 
+     private boolean filter(Object obj) {
++        if (obj instanceof TLRPC.User && desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, ((TLRPC.User) obj).id)) return false;
++        if (obj instanceof TLRPC.Chat && desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, -((TLRPC.Chat) obj).id)) return false;
+         if (dialogsType != DialogsActivity.DIALOGS_TYPE_START_ATTACH_BOT) {
+             return true;
+         }
+@@ -467,6 +469,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
+                         for (int a = 0; a < res.messages.size(); a++) {
+                             TLRPC.Message message = res.messages.get(a);
+                             long did = MessageObject.getDialogId(message);
++                            if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, did)) continue;
+                             int maxId = MessagesController.getInstance(currentAccount).deletedHistory.get(did);
+                             if (maxId != 0 && message.id <= maxId) {
+                                 continue;
+@@ -625,6 +628,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
+                         for (int a = 0; a < res.messages.size(); a++) {
+                             TLRPC.Message message = res.messages.get(a);
+                             long did = MessageObject.getDialogId(message);
++                            if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, did)) continue;
+                             int maxId = MessagesController.getInstance(currentAccount).deletedHistory.get(did);
+                             if (maxId != 0 && message.id <= maxId) {
+                                 continue;
+@@ -743,6 +747,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
+                 final LongSparseArray<RecentSearchObject> hashMap = new LongSparseArray<>();
+                 while (cursor.next()) {
+                     long did = cursor.longValue(0);
++                    if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, did)) continue;
+ 
+                     boolean add = false;
+                     if (DialogObject.isEncryptedDialog(did)) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/SearchAdapterHelper.java b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/SearchAdapterHelper.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Adapters/SearchAdapterHelper.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Adapters/SearchAdapterHelper.java
+@@ -223,13 +223,13 @@ public class SearchAdapterHelper {
+                                         chat = chatsMap.get(peer.channel_id);
+                                     }
+                                     if (chat != null) {
+-                                        if (!allowChats || canAddGroupsOnly && !ChatObject.canAddBotsToChat(chat) || !allowGlobalResults && ChatObject.isNotInChat(chat) || !filter(chat)) {
++                                        if (!allowChats || canAddGroupsOnly && !ChatObject.canAddBotsToChat(chat) || !allowGlobalResults && ChatObject.isNotInChat(chat) || !filter(chat) || desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, -chat.id)) {
+                                             continue;
+                                         }
+                                         globalSearch.add(chat);
+                                         globalSearchMap.put(-chat.id, chat);
+                                     } else if (user != null) {
+-                                        if (canAddGroupsOnly || !allowBots && user.bot || !allowSelf && user.self || !allowGlobalResults && b == 1 && !user.contact || !filter(user)) {
++                                        if (canAddGroupsOnly || !allowBots && user.bot || !allowSelf && user.self || !allowGlobalResults && b == 1 && !user.contact || !filter(user) || desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, user.id)) {
+                                             continue;
+                                         }
+                                         globalSearch.add(user);
+@@ -250,13 +250,13 @@ public class SearchAdapterHelper {
+                                         chat = chatsMap.get(peer.channel_id);
+                                     }
+                                     if (chat != null) {
+-                                        if (!allowChats || canAddGroupsOnly && !ChatObject.canAddBotsToChat(chat) || -chat.id == exceptDialogId || !filter(chat)) {
++                                        if (!allowChats || canAddGroupsOnly && !ChatObject.canAddBotsToChat(chat) || -chat.id == exceptDialogId || !filter(chat) || desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, -chat.id)) {
+                                             continue;
+                                         }
+                                         localServerSearch.add(chat);
+                                         globalSearchMap.put(-chat.id, chat);
+                                     } else if (user != null) {
+-                                        if (canAddGroupsOnly || !allowBots && user.bot || !allowSelf && user.self || user.id == exceptDialogId || !filter(user)) {
++                                        if (canAddGroupsOnly || !allowBots && user.bot || !allowSelf && user.self || user.id == exceptDialogId || !filter(user) || desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, user.id)) {
+                                             continue;
+                                         }
+                                         localServerSearch.add(user);
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/CallLogActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/CallLogActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/CallLogActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/CallLogActivity.java
+@@ -294,6 +294,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
+ 				if (msg.messageOwner.action instanceof TLRPC.TL_messageActionPhoneCall) {
+ 					long fromId = msg.getFromChatId();
+ 					long userID = fromId == getUserConfig().getClientUserId() ? msg.messageOwner.peer_id.user_id : fromId;
++					if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, userID)) continue;
+ 					int callType = fromId == getUserConfig().getClientUserId() ? TYPE_OUT : TYPE_IN;
+ 					TLRPC.PhoneCallDiscardReason reason = msg.messageOwner.action.reason;
+ 					if (callType == TYPE_IN && (reason instanceof TLRPC.TL_phoneCallDiscardReasonMissed || reason instanceof TLRPC.TL_phoneCallDiscardReasonBusy)) {
+@@ -326,6 +327,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
+ 					long fromId = msg.getFromChatId();
+ 					final Set<Long> userIds = action.other_participants.stream().map(DialogObject::getPeerDialogId).collect(Collectors.toSet());
+ 					userIds.add(fromId == getUserConfig().getClientUserId() ? msg.messageOwner.peer_id.user_id : fromId);
++					if (desu.inugram.helpers.security.ParanoiaHelper.anyHidden(currentAccount, userIds)) continue;
+ 					int callType = fromId == getUserConfig().getClientUserId() ? TYPE_OUT : TYPE_IN;
+ 					if (callType == TYPE_IN && action.missed) {
+ 						callType = TYPE_MISSED_IN;
+@@ -1346,6 +1348,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
+ 						final TLRPC.TL_messageActionConferenceCall action = (TLRPC.TL_messageActionConferenceCall) msg.action;
+ 						userIds.add(userID);
+ 						userIds.addAll(action.other_participants.stream().map(DialogObject::getPeerDialogId).collect(Collectors.toSet()));
++						if (desu.inugram.helpers.security.ParanoiaHelper.anyHidden(currentAccount, userIds)) continue;
+ 						if (callType == TYPE_IN && action.missed) {
+ 							callType = TYPE_MISSED_IN;
+ 						}
+@@ -1403,6 +1406,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
+ 
+ 					} else {
+ 						userIds.add(userID);
++						if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, userID)) continue;
+ 						TLRPC.PhoneCallDiscardReason reason = msg.action.reason;
+ 						if (callType == TYPE_IN && (reason instanceof TLRPC.TL_phoneCallDiscardReasonMissed || reason instanceof TLRPC.TL_phoneCallDiscardReasonBusy)) {
+ 							callType = TYPE_MISSED_IN;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/AppIconsSelectorCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/AppIconsSelectorCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/AppIconsSelectorCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/AppIconsSelectorCell.java
+@@ -151,6 +151,7 @@ public class AppIconsSelectorCell extends RecyclerListView implements Notificati
+     private void updateIconsVisibility() {
+         availableIcons.clear();
+         availableIcons.addAll(Arrays.asList(LauncherIconController.LauncherIcon.values()));
++        desu.inugram.helpers.security.ParanoiaHelper.filterLauncherIcons(availableIcons);
+         if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+             for (int i = 0; i < availableIcons.size(); i++) {
+                 if (availableIcons.get(i).premium) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ShareAlert.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ShareAlert.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ShareAlert.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ShareAlert.java
+@@ -2933,6 +2933,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
+                 if (dialog.id == selfUserId) {
+                     continue;
+                 }
++                if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, dialog.id)) continue;
+                 if (!DialogObject.isEncryptedDialog(dialog.id)) {
+                     if (DialogObject.isUserDialog(dialog.id)) {
+                         if (dialog.folder_id == 1) {
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+@@ -6820,7 +6820,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             filterOptions = null;
+         }
+         final ArrayList<MessagesController.DialogFilter> filters = getMessagesController().getDialogFilters();
+-        if (filters.size() > 1) {
++        if (filters.size() > 1 && !desu.inugram.helpers.security.ParanoiaHelper.shouldHideFolders()) {
+             if (force || filterTabsView.getVisibility() != View.VISIBLE) {
+                 boolean animatedUpdateItems = animated;
+                 if (filterTabsView.getVisibility() != View.VISIBLE) {
+@@ -8422,7 +8422,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+         final ArrayList<Long> dialogIdArray = new ArrayList<>();
+         dialogIdArray.add(dialogId);
+ 
+-        boolean hasFolders = getMessagesController().filtersEnabled && getMessagesController().dialogFiltersLoaded && getMessagesController().dialogFilters != null && getMessagesController().dialogFilters.size() > 0;
++        boolean hasFolders = getMessagesController().filtersEnabled && getMessagesController().dialogFiltersLoaded && getMessagesController().dialogFilters != null && getMessagesController().dialogFilters.size() > 0 && !desu.inugram.helpers.security.ParanoiaHelper.shouldHideFolders();
+         final ActionBarPopupWindow.ActionBarPopupWindowLayout[] previewMenu = new ActionBarPopupWindow.ActionBarPopupWindowLayout[1];
+ 
+         LinearLayout foldersMenuView = null;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java b/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Stories/StoriesController.java
+@@ -470,6 +470,7 @@ public class StoriesController {
+         for (int i = 0; i < storiesResponse.peer_stories.size(); i++) {
+             TL_stories.PeerStories userStories = storiesResponse.peer_stories.get(i);
+             final long dialogId = DialogObject.getPeerDialogId(userStories.peer);
++            if (desu.inugram.helpers.security.ParanoiaHelper.isHidden(currentAccount, dialogId)) continue;
+             for (int j = 0; j < userStories.stories.size(); j++) {
+                 TL_stories.StoryItem story = userStories.stories.get(j);
+                 if (story instanceof TL_stories.TL_storyItemDeleted ||

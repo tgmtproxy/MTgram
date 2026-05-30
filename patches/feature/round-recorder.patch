@@ -1,0 +1,254 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Sun, 24 May 2026 22:53:36 +0400
+Subject: improvements to the round recorder
+
+---
+ .../messenger/camera/Camera2Session.java      | 18 ++++++++
+ .../messenger/camera/CameraSession.java       |  2 +-
+ .../ui/Components/InstantCameraView.java      | 41 ++++++++++++++-----
+ 3 files changed, 50 insertions(+), 11 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/camera/Camera2Session.java b/TMessagesProj/src/main/java/org/telegram/messenger/camera/Camera2Session.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/camera/Camera2Session.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/camera/Camera2Session.java
+@@ -46,6 +46,8 @@ import java.util.Arrays;
+ import java.util.Collections;
+ import java.util.Comparator;
+ import java.util.List;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.TimeUnit;
+ 
+ @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+ public class Camera2Session {
+@@ -80,6 +82,10 @@ public class Camera2Session {
+ 
+     private long lastTime;
+ 
++    // inu: HAL doesn't release the camera until onClosed fires; waiting for it makes
++    // dual-camera reopen reliable (otherwise the second open silently produces no frames)
++    private final CountDownLatch inu_closedLatch = new CountDownLatch(1);
++
+     public static Camera2Session create(boolean front, int viewWidth, int viewHeight) {
+         final Context context = ApplicationLoader.applicationContext;
+         final CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+@@ -145,6 +151,12 @@ public class Camera2Session {
+                 FileLog.d("Camera2Session camera #" + cameraId + " disconnected");
+             }
+ 
++            @Override
++            public void onClosed(@NonNull CameraDevice camera) {
++                FileLog.d("Camera2Session camera #" + cameraId + " closed");
++                inu_closedLatch.countDown();
++            }
++
+             @Override
+             public void onError(@NonNull CameraDevice camera, int error) {
+                 Camera2Session.this.cameraDevice = camera;
+@@ -427,6 +439,12 @@ public class Camera2Session {
+             if (cameraDevice != null) {
+                 cameraDevice.close();
+                 cameraDevice = null;
++                // onClosed is dispatched via the camera handler; await BEFORE quitting it
++                try {
++                    inu_closedLatch.await(500, TimeUnit.MILLISECONDS);
++                } catch (InterruptedException e) {
++                    FileLog.e(e);
++                }
+             }
+             if (imageReader != null) {
+                 imageReader.close();
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/camera/CameraSession.java b/TMessagesProj/src/main/java/org/telegram/messenger/camera/CameraSession.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/camera/CameraSession.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/camera/CameraSession.java
+@@ -48,7 +48,7 @@ public class CameraSession {
+     private int jpegOrientation;
+     private boolean sameTakePictureOrientation;
+     private boolean flipFront = true;
+-    private float currentZoom;
++    public float currentZoom;
+     private boolean optimizeForBarcode;
+     private boolean useTorch;
+     private boolean isRound;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/InstantCameraView.java
+@@ -69,6 +69,7 @@ import androidx.core.graphics.ColorUtils;
+ 
+ import com.google.android.exoplayer2.ExoPlayer;
+ 
++import desu.inugram.helpers.chat.RoundRecorderHelper;
+ import desu.inugram.helpers.chat.VoiceRecorderHelper;
+ import org.telegram.messenger.AndroidUtilities;
+ import org.telegram.messenger.ApplicationLoader;
+@@ -325,6 +326,8 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+         buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+         addView(buttonsLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 56, Gravity.LEFT | Gravity.BOTTOM, 1, 0, 0, 0));
+ 
++        inu_zoomSlider = RoundRecorderHelper.attachZoomSlider(this, t -> RoundRecorderHelper.applyZoomT(inu_zoomSlider, camera2SessionCurrent, cameraSession, t));
++
+         switchCameraButton = new FlashViews.ImageViewInvertable(context);
+         switchCameraButton.setScaleType(ImageView.ScaleType.CENTER);
+         switchCameraButton.setContentDescription(LocaleController.getString(R.string.AccDescrSwitchCamera));
+@@ -595,6 +598,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+ 
+     public void destroy(boolean async) {
+         if (useCamera2) {
++            if (bothCameras) RoundRecorderHelper.destroyDualAsync(camera2Sessions);
+             for (int a = 0; a < camera2Sessions.length; ++a) {
+                 if (camera2Sessions[a] != null) {
+                     camera2Sessions[a].destroy(async);
+@@ -666,6 +670,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+         if (recording) {
+             cancelled = recordedTime < 800;
+             recording = false;
++            RoundRecorderHelper.setSliderVisible(inu_zoomSlider, false);
+             updateFlash();
+             if (cameraThread != null) {
+                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.recordStopped, recordingGuid, cancelled ? 4 : 2);
+@@ -774,8 +779,9 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+         }
+ 
+         if (useCamera2) {
+-            bothCameras = DualCameraView.roundDualAvailableStatic(getContext());
++            bothCameras = DualCameraView.roundDualAvailableStatic(getContext()) && desu.inugram.InuConfig.ROUND_RECORDER_DUAL_CAMERA.getValue();
+             if (bothCameras) {
++                RoundRecorderHelper.awaitPendingDualCleanup();
+                 for (int a = 0; a < 2; ++a) {
+                     if (camera2Sessions[a] == null) {
+                         camera2Sessions[a] = Camera2Session.create(a == 0, MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize, MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize);
+@@ -791,6 +797,8 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+                     bothCameras = false;
+                 }
+                 if (camera2SessionCurrent == null) return;
++                // dual: render/encode is driven by surfaceIndex, not camera2SessionCurrent
++                surfaceIndex = isFrontface ? 0 : 1;
+             } else {
+                 camera2SessionCurrent = camera2Sessions[isFrontface ? 0 : 1] = Camera2Session.create(isFrontface, MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize, MessagesController.getInstance(UserConfig.selectedAccount).roundVideoSize);
+                 if (camera2SessionCurrent == null) return;
+@@ -1012,6 +1020,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+             cancelled = recordedTime < 800;
+             recording = false;
+             flashing = false;
++            RoundRecorderHelper.setSliderVisible(inu_zoomSlider, false);
+             updateFlash();
+             int reason;
+             if (cancelled) {
+@@ -1071,6 +1080,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+         cancelled = true;
+         recording = false;
+         flashing = false;
++        RoundRecorderHelper.setSliderVisible(inu_zoomSlider, false);
+         updateFlash();
+         NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.recordStopped, recordingGuid, byGesture ? 0 : 6);
+         if (cameraThread != null) {
+@@ -1161,6 +1171,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+         initCamera();
+         cameraReady = false;
+         cameraThread.reinitForNewCamera();
++        RoundRecorderHelper.syncSlider(inu_zoomSlider, camera2SessionCurrent, cameraSession);
+     }
+ 
+     // Old Camera1 API
+@@ -1327,9 +1338,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+ 
+             if (useCamera2) {
+                 if (bothCameras) {
+-                    if (camera2Sessions[index] != null) {
+-                        camera2Sessions[index].open(surfaceTexture);
+-                    }
++                    RoundRecorderHelper.openDualSerialized(camera2Sessions, index, surfaceIndex, surfaceTexture);
+                 } else {
+                     if (index == 1) return;
+                     cameraThread.setCurrentSession(camera2SessionCurrent);
+@@ -1973,6 +1982,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+ 
+                     textureBuffer = ByteBuffer.allocateDirect(texData.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+                     textureBuffer.put(texData).position(0);
++                    AndroidUtilities.runOnUIThread(() -> RoundRecorderHelper.syncSlider(inu_zoomSlider, camera2SessionCurrent, cameraSession));
+                     break;
+                 }
+             }
+@@ -3258,6 +3268,8 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+                     recordPlusTime = fromPause ? recordedTime : 0;
+                     recordStartTime = System.currentTimeMillis();
+                     recording = true;
++                    RoundRecorderHelper.syncSlider(inu_zoomSlider, camera2SessionCurrent, cameraSession);
++                    RoundRecorderHelper.setSliderVisible(inu_zoomSlider, true);
+                     updateFlash();
+                     invalidate();
+                     NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.recordStarted, recordingGuid, false);
+@@ -3729,6 +3741,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+                 pinchStartDistance = (float) Math.hypot(ev.getX(1) - ev.getX(0), ev.getY(1) - ev.getY(0));
+ 
+                 pinchScale = 1f;
++                inu_pinchStartT = RoundRecorderHelper.currentZoomT(camera2SessionCurrent, cameraSession);
+ 
+                 pointerId1 = ev.getPointerId(0);
+                 pointerId2 = ev.getPointerId(1);
+@@ -3757,15 +3770,17 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+                 return false;
+             }
+             pinchScale = (float) Math.hypot(ev.getX(index2) - ev.getX(index1), ev.getY(index2) - ev.getY(index1)) / pinchStartDistance;
++            float t = inu_pinchStartT + RoundRecorderHelper.pinchDeltaT(pinchScale);
+             if (useCamera2) {
+                 if (camera2SessionCurrent != null) {
+-                    float zoom = Utilities.clamp(pinchScale, camera2SessionCurrent.getMaxZoom(), camera2SessionCurrent.getMinZoom());
++                    float zoom = RoundRecorderHelper.mapZoomT(t, camera2SessionCurrent.getMinZoom(), camera2SessionCurrent.getMaxZoom());
+                     camera2SessionCurrent.setZoom(zoom);
+                 }
+             } else {
+-                float zoom = Math.min(1f, Math.max(0, pinchScale - 1f));
++                float zoom = t;
+                 cameraSession.setZoom(zoom);
+             }
++            if (inu_zoomSlider != null) inu_zoomSlider.setZoom(t, false);
+         } else if ((ev.getActionMasked() == MotionEvent.ACTION_UP || (ev.getActionMasked() == MotionEvent.ACTION_POINTER_UP && checkPointerIds(ev)) || ev.getActionMasked() == MotionEvent.ACTION_CANCEL) && isInPinchToZoomTouchMode) {
+             isInPinchToZoomTouchMode = false;
+             finishZoom();
+@@ -3774,32 +3789,38 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
+     }
+ 
+     ValueAnimator finishZoomTransition;
++    private ZoomControlView inu_zoomSlider;
++    private float inu_pinchStartT = 0f;
+ 
+     public void finishZoom() {
+         if (finishZoomTransition != null) {
+             return;
+         }
+ 
++        if (desu.inugram.InuConfig.ROUND_RECORDER_KEEP_ZOOM.getValue()) return;
++
+         float zoom;
+         if (useCamera2) {
+             if (camera2SessionCurrent == null) return;
+-            zoom = Utilities.clamp(pinchScale, camera2SessionCurrent.getMaxZoom(), camera2SessionCurrent.getMinZoom());
++            zoom = RoundRecorderHelper.currentZoomT(camera2SessionCurrent, null);
+         } else {
+-            zoom = Math.min(1f, Math.max(0, pinchScale - 1f));
++            zoom = cameraSession == null ? 0f : cameraSession.currentZoom;
+         }
+ 
+         if (zoom > 0f) {
+             finishZoomTransition = ValueAnimator.ofFloat(zoom, 0);
+             finishZoomTransition.addUpdateListener(valueAnimator -> {
++                float t = (float) valueAnimator.getAnimatedValue();
+                 if (useCamera2) {
+                     if (camera2SessionCurrent != null) {
+-                        camera2SessionCurrent.setZoom((float) valueAnimator.getAnimatedValue());
++                        camera2SessionCurrent.setZoom(RoundRecorderHelper.mapZoomT(t, camera2SessionCurrent.getMinZoom(), camera2SessionCurrent.getMaxZoom()));
+                     }
+                 } else {
+                     if (cameraSession != null) {
+-                        cameraSession.setZoom((float) valueAnimator.getAnimatedValue());
++                        cameraSession.setZoom(t);
+                     }
+                 }
++                if (inu_zoomSlider != null) inu_zoomSlider.setZoom(t, false);
+             });
+             finishZoomTransition.addListener(new AnimatorListenerAdapter() {
+                 @Override

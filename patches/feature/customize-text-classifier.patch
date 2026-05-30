@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 21 Apr 2026 12:16:02 +0300
+Subject: customizable TextClassifier used by the input fields, primarily to reduce false positive expansions
+
+---
+ .../main/java/org/telegram/ui/Components/EditTextBoldCursor.java | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/EditTextBoldCursor.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/EditTextBoldCursor.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/EditTextBoldCursor.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/EditTextBoldCursor.java
+@@ -229,6 +229,7 @@ public class EditTextBoldCursor extends EditTextEffects {
+             setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+         }
+         init();
++        desu.inugram.helpers.TextClassifierHelper.configure(this);
+     }
+ 
+     public void useAnimatedTextDrawable() {

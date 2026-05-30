@@ -1,0 +1,139 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 23 Apr 2026 18:09:31 +0300
+Subject: hooks inside admin logs activity
+
+---
+ .../org/telegram/messenger/MessageObject.java |  4 ++
+ .../telegram/ui/ChannelAdminLogActivity.java  | 42 +++++++++++++++++--
+ 2 files changed, 43 insertions(+), 3 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/MessageObject.java
+@@ -2883,6 +2883,9 @@ public class MessageObject {
+                 message.media.webpage.display_url = "";
+                 message.media.webpage.url = "";
+             }
++            if (desu.inugram.helpers.AdminLogHelper.applyEditDiff(message, oldMessage, newMessage)) {
++                webPageDescriptionEntities = null;
++            }
+         } else if (event.action instanceof TLRPC.TL_channelAdminLogEventActionChangeEmojiStickerSet) {
+             TLRPC.InputStickerSet newPack = ((TLRPC.TL_channelAdminLogEventActionChangeEmojiStickerSet) event.action).new_stickerset;
+             TLRPC.InputStickerSet oldPack = ((TLRPC.TL_channelAdminLogEventActionChangeEmojiStickerSet) event.action).new_stickerset;
+@@ -3462,6 +3465,7 @@ public class MessageObject {
+                 messageObject.linkDescription = null;
+                 messageObject.generateLinkDescription();
+             }
++            desu.inugram.helpers.AdminLogHelper.injectBubbles(currentAccount, event, messageObjects, chat, mid, addToEnd);
+         }
+         if (event.action instanceof TLRPC.TL_channelAdminLogEventActionDeleteMessage) {
+             return;
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChannelAdminLogActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChannelAdminLogActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChannelAdminLogActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChannelAdminLogActivity.java
+@@ -172,6 +172,7 @@ import java.util.HashMap;
+ import java.util.HashSet;
+ import java.util.List;
+ 
++import desu.inugram.helpers.AdminLogHelper;
+ import me.vkryl.core.BitwiseUtils;
+ import me.vkryl.core.reference.ReferenceList;
+ 
+@@ -206,7 +207,7 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+     private TextView bottomOverlayChatText;
+     private ChatActivityChannelButtonsLayout bottomOverlayChat2;
+     private FrameLayout emptyViewContainer;
+-    private ChatAvatarContainer avatarContainer;
++    public ChatAvatarContainer avatarContainer;
+     private LinearLayout emptyLayoutView;
+     private ImageView emptyImageView;
+     private TextView emptyView;
+@@ -519,6 +520,34 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+         });
+     }
+ 
++    public void inu_rebuildEvents() {
++        java.util.LinkedHashMap<Long, TLRPC.TL_channelAdminLogEvent> events = new java.util.LinkedHashMap<>();
++        for (MessageObject mo : messages) {
++            if (mo.currentEvent != null && !events.containsKey(mo.currentEvent.id)) {
++                events.put(mo.currentEvent.id, mo.currentEvent);
++            }
++        }
++        messages.clear();
++        messagesDict.clear();
++        messagesByDays.clear();
++        realMessagesDict.clear();
++        mid[0] = 2;
++        for (TLRPC.TL_channelAdminLogEvent event : events.values()) {
++            MessageObject mo = new MessageObject(currentAccount, event, messages, messagesByDays, currentChat, mid, false);
++            if (mo.contentType < 0) continue;
++            messagesDict.put(event.id, mo);
++        }
++        for (MessageObject mo : messages) {
++            if (mo.contentType != 0 && mo.getRealId() >= 0) {
++                realMessagesDict.put(mo.getRealId(), mo);
++            }
++        }
++        filterDeletedMessages();
++        if (chatAdapter != null) {
++            chatAdapter.notifyDataSetChanged();
++        }
++    }
++
+     private void loadMessages(boolean reset) {
+         if (loading) {
+             return;
+@@ -931,7 +960,9 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+             public void onItemClick(final int id) {
+                 if (id == -1) {
+                     finishFragment();
++                    return;
+                 }
++                AdminLogHelper.processActionBarMenuItem(id, ChannelAdminLogActivity.this);
+             }
+         });
+ 
+@@ -972,6 +1003,7 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+             }
+         });
+         searchItem.setSearchFieldHint(getString(R.string.Search));
++        AdminLogHelper.setupHeader(this, menu);
+ 
+         actionBar.getBackButton().setTranslationX(dp(6));
+         actionBar.menu.setTranslationX(-dp(9));
+@@ -1648,7 +1680,7 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+     private final static int OPTION_CALL = 17;
+     private final static int OPTION_RESTRICT = 33;
+     private final static int OPTION_REPORT_FALSE_POSITIVE = 34;
+-    private final static int OPTION_BAN = 35;
++    public final static int OPTION_BAN = 35;
+ 
+     private boolean createMenu(View v) {
+         return createMenu(v, 0, 0);
+@@ -1862,6 +1894,7 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+                 options.add(OPTION_CALL);
+             }
+         }
++        AdminLogHelper.addMenuItems(items, options, icons, selectedObject);
+ 
+         boolean callbackSent = false;
+ 
+@@ -2118,11 +2151,14 @@ public class ChannelAdminLogActivity extends BaseFragment implements Notificatio
+         roundVideoContainer.setVisibility(View.INVISIBLE);
+     }
+ 
+-    private void processSelectedOption(int option) {
++    public void processSelectedOption(int option) {
+         closeMenu();
+         if (selectedObject == null) {
+             return;
+         }
++        if (AdminLogHelper.processMenuOption(option, this, selectedObject)) {
++            return;
++        }
+         switch (option) {
+             case OPTION_COPY: {
+                 AndroidUtilities.addToClipboard(getMessageContent(selectedObject, 0, true));

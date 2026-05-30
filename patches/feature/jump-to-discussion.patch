@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 13 Apr 2026 01:39:15 +0300
+Subject: a button to jump from comments to discussion group
+
+---
+ .../src/main/java/org/telegram/ui/ChatActivity.java          | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -4160,6 +4160,11 @@ public class ChatActivity extends BaseFragment implements
+             searchItemVisible = false;
+         }
+ 
++        if (isReplyChatComment()) {
++            menu.addItem(ChatActionsHelper.ACTION_OPEN_IN_DISCUSSION, R.drawable.msg_discussion)
++                .setContentDescription(LocaleController.getString(R.string.InuOpenInDiscussion));
++        }
++
+         if (chatMode == 0 && (threadMessageId == 0 || isTopic) && !UserObject.isReplyUser(currentUser) && !isReport()) {
+             TLRPC.UserFull userFull = null;
+             if (currentUser != null) {

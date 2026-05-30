@@ -1,0 +1,85 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Mon, 13 Apr 2026 01:29:31 +0300
+Subject: allow sending message to discussion group without joining
+
+---
+ .../main/java/org/telegram/ui/ChatActivity.java  | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -4952,7 +4952,7 @@ public class ChatActivity extends BaseFragment implements
+                         if (
+                             bottomChannelButtonsLayout != null && bottomChannelButtonsLayout.getVisibility() == View.VISIBLE && !(bottomOverlayChatWaitsReply && allowReplyOnOpenTopic || message.wasJustSent) ||
+                             currentChat != null && (
+-                                ChatObject.isNotInChat(currentChat) && !isThreadChat() ||
++                                !ChatHelper.isEffectivelyInChat(currentChat) && !isThreadChat() ||
+                                 ChatObject.isChannel(currentChat) && !ChatObject.canPost(currentChat) && !currentChat.megagroup ||
+                                 !ChatObject.canSendMessages(currentChat)
+                             )
+@@ -19061,7 +19061,7 @@ public class ChatActivity extends BaseFragment implements
+                 if (actionsButtonsLayout != null) {
+                     boolean allowChatActions = true;
+                     if (bottomChannelButtonsLayout != null && bottomChannelButtonsLayout.getVisibility() == View.VISIBLE && !bottomOverlayChatWaitsReply ||
+-                            currentChat != null && (ChatObject.isNotInChat(currentChat) && !isThreadChat() || ChatObject.isChannel(currentChat) && !ChatObject.canPost(currentChat) && !currentChat.megagroup || !ChatObject.canSendMessages(currentChat))) {
++                            currentChat != null && (!ChatHelper.isEffectivelyInChat(currentChat) && !isThreadChat() || ChatObject.isChannel(currentChat) && !ChatObject.canPost(currentChat) && !currentChat.megagroup || !ChatObject.canSendMessages(currentChat))) {
+                         allowChatActions = false;
+                     }
+ 
+@@ -27240,7 +27240,7 @@ public class ChatActivity extends BaseFragment implements
+             long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialog_id, -1);
+             boolean shouldApply = false;
+             if (ChatObject.isChannel(currentChat) && !(currentChat instanceof TLRPC.TL_channelForbidden)) {
+-                if (ChatObject.isNotInChat(currentChat) && !UserObject.isBotForum(currentUser) && (ChatObject.isForum(currentChat) || !isThreadChat() || currentChat.join_to_send)) {
++                if (!ChatHelper.isEffectivelyInChat(currentChat) && !UserObject.isBotForum(currentUser) && (ChatObject.isForum(currentChat) || !isThreadChat() || currentChat.join_to_send)) {
+                     if (getMessagesController().isJoiningChannel(currentChat.id)) {
+                         showBottomOverlayProgress(true, false);
+                     } else {
+@@ -27461,7 +27461,7 @@ public class ChatActivity extends BaseFragment implements
+                 bottomChannelButtonsLayout.setVisibility(View.VISIBLE);
+                 chatActivityEnterView.setVisibility(View.INVISIBLE);
+             } else if (chatMode == MODE_PINNED ||
+-                    currentChat != null && (!ChatObject.isMonoForum(currentChat) || !isSubscriberSuggestions) && ((ChatObject.isNotInChat(currentChat) && !UserObject.isBotForum(currentUser) || !ChatObject.canWriteToChat(currentChat)) && (currentChat.join_to_send || !isThreadChat() || ChatObject.isForum(currentChat)) || forumTopic != null && forumTopic.closed && !ChatObject.canManageTopic(currentAccount, currentChat, forumTopic) || shouldDisplaySwipeToLeftToReplyInForum()) ||
++                    currentChat != null && (!ChatObject.isMonoForum(currentChat) || !isSubscriberSuggestions) && ((!ChatHelper.isEffectivelyInChat(currentChat) && !UserObject.isBotForum(currentUser) || !ChatObject.canWriteToChat(currentChat)) && (currentChat.join_to_send || !isThreadChat() || ChatObject.isForum(currentChat)) || forumTopic != null && forumTopic.closed && !ChatObject.canManageTopic(currentAccount, currentChat, forumTopic) || shouldDisplaySwipeToLeftToReplyInForum()) ||
+                     currentUser != null && (UserObject.isDeleted(currentUser) || userBlocked || UserObject.isReplyUser(currentUser))) {
+                 if (chatActivityEnterView.isEditingMessage()) {
+                     chatActivityEnterView.setVisibility(View.VISIBLE);
+@@ -30323,7 +30323,7 @@ public class ChatActivity extends BaseFragment implements
+             allowChatActions = false;
+         }
+ 
+-        if (currentChat != null && (ChatObject.isNotInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat())) {
++        if (currentChat != null && (!ChatHelper.isEffectivelyInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat())) {
+             allowChatActions = false;
+         }
+ 
+@@ -33039,7 +33039,7 @@ public class ChatActivity extends BaseFragment implements
+                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.noforwards) {
+                     return;
+                 }
+-                if (selectedObject != null && currentChat != null && (ChatObject.isNotInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat() || ChatObject.isChannel(currentChat) && !ChatObject.canPost(currentChat) && !currentChat.megagroup || !ChatObject.canSendMessages(currentChat))) {
++                if (selectedObject != null && currentChat != null && (!ChatHelper.isEffectivelyInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat() || ChatObject.isChannel(currentChat) && !ChatObject.canPost(currentChat) && !currentChat.megagroup || !ChatObject.canSendMessages(currentChat))) {
+                     MessageObject messageObject = selectedObject;
+                     if (messageObject.getGroupId() != 0) {
+                         MessageObject.GroupedMessages group = getGroup(messageObject.getGroupId());
+@@ -44342,7 +44342,7 @@ public class ChatActivity extends BaseFragment implements
+             final boolean suggestUpdate = (currentChat != null && currentChat.broadcast_messages_allowed && currentChat.linked_monoforum_id != 0)
+                 != (bottomChannelButtonsLayout != null && bottomChannelButtonsLayout.isButtonVisible(ChatActivityChannelButtonsLayout.BUTTON_DIRECT));
+ 
+-            if (giftUpdate || suggestUpdate) {
++            if (giftUpdate || suggestUpdate || ChatHelper.isEffectivelyInChat(currentChat)) {
+                 updateBottomOverlay(true);
+             }
+         }
+@@ -44890,7 +44890,7 @@ public class ChatActivity extends BaseFragment implements
+             allowChatActions = false;
+         }
+ 
+-        if (currentChat != null && (ChatObject.isNotInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat())) {
++        if (currentChat != null && (!ChatHelper.isEffectivelyInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat())) {
+             allowChatActions = false;
+         }
+ 

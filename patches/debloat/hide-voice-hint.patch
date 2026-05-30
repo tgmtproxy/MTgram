@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 02:49:39 +0300
+Subject: show voice/video button hint only once
+
+---
+ .../src/main/java/org/telegram/messenger/SharedConfig.java      | 1 +
+ TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java   | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java b/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/SharedConfig.java
+@@ -890,6 +890,7 @@ public class SharedConfig {
+         dayNightThemeSwitchHintCount = 3;
+         stealthModeSendMessageConfirm = 2;
+         dayNightWallpaperSwitchHint = 0;
++        desu.inugram.InuConfig.VOICE_HINT_SHOWN.setValue(true);
+         saveConfig();
+     }
+ 
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -12721,6 +12721,7 @@ public class ChatActivity extends BaseFragment implements
+     }
+ 
+     private void showVoiceHint(boolean hide, boolean video) {
++        if (InuConfig.VOICE_HINT_SHOWN.getValue()) return;
+         if (getParentActivity() == null || fragmentView == null || hide && voiceHintTextView == null || chatMode != 0 || chatActivityEnterView == null  || chatActivityEnterView.getAudioVideoButtonContainer() == null || chatActivityEnterView.getAudioVideoButtonContainer().getVisibility() != View.VISIBLE || isInPreviewMode()) {
+             return;
+         }
+@@ -12745,6 +12746,7 @@ public class ChatActivity extends BaseFragment implements
+         }
+ 
+         voiceHintTextView.showForView(chatActivityEnterView.getAudioVideoButtonContainer(), true);
++        InuConfig.VOICE_HINT_SHOWN.setValue(true);
+     }
+ 
+     public boolean checkSlowMode(View view) {

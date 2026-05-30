@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Tue, 26 May 2026 21:55:28 +0400
+Subject: add seekbar to gifs
+
+---
+ .../src/main/java/org/telegram/ui/PhotoViewer.java | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/PhotoViewer.java b/TMessagesProj/src/main/java/org/telegram/ui/PhotoViewer.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/PhotoViewer.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/PhotoViewer.java
+@@ -10897,7 +10897,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
+             videoTimelineView.setProgress(videoTimelineView.getLeftProgress());
+             videoPlayerSeekbar.setBufferedProgress(0);
+ 
+-            if (currentMessageObject != null) {
++            if (currentMessageObject != null && !desu.inugram.helpers.media.PhotoViewerHelper.gifAsVideo(currentMessageObject)) {
+                 final int duration = (int) currentMessageObject.getDuration();
+                 final String name = currentMessageObject.getFileNameFast();
+                 if (!TextUtils.isEmpty(name)) {
+@@ -14679,7 +14679,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
+                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.dialogPhotosUpdate, dialogPhotos);
+             }
+         }
+-        if (currentMessageObject != null && currentMessageObject.isVideo() || currentBotInlineResult != null && (currentBotInlineResult.type.equals("video") || MessageObject.isVideoDocument(currentBotInlineResult.document)) || (pageBlocksAdapter != null && (pageBlocksAdapter.isVideo(index) || pageBlocksAdapter.isHardwarePlayer(index))) || (sendPhotoType == SELECT_TYPE_NO_SELECT && ((MediaController.PhotoEntry)imagesArrLocals.get(index)).isVideo)) {
++        if (currentMessageObject != null && currentMessageObject.isVideo() || desu.inugram.helpers.media.PhotoViewerHelper.gifAsVideo(currentMessageObject) || currentBotInlineResult != null && (currentBotInlineResult.type.equals("video") || MessageObject.isVideoDocument(currentBotInlineResult.document)) || (pageBlocksAdapter != null && (pageBlocksAdapter.isVideo(index) || pageBlocksAdapter.isHardwarePlayer(index))) || (sendPhotoType == SELECT_TYPE_NO_SELECT && ((MediaController.PhotoEntry)imagesArrLocals.get(index)).isVideo)) {
+             playerAutoStarted = true;
+             onActionClick(false);
+         } else if (!imagesArrLocals.isEmpty()) {
+@@ -17070,7 +17070,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
+                 if (!TextUtils.isEmpty(restrictionReason)) {
+                     imageReceiver.setImageBitmap(parentActivity.getResources().getDrawable(R.drawable.photoview_placeholder));
+                     return;
+-                } else if (messageObject.isVideo()) {
++                } else if (messageObject.isVideo() || desu.inugram.helpers.media.PhotoViewerHelper.gifAsVideo(messageObject)) {
+                     if (messageObject.photoThumbs != null && !messageObject.photoThumbs.isEmpty()) {
+                         ImageReceiver.BitmapHolder placeHolder = null;
+                         if (currentThumb != null && imageReceiver == centerImage) {
+@@ -17798,7 +17798,13 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
+             if (messageObject != null) {
+                 currentAnimation = object.allowTakeAnimation ? object.imageReceiver.getAnimation() : null;
+                 if (currentAnimation != null) {
+-                    if (messageObject.isVideo()) {
++                    if (messageObject.isVideo() || desu.inugram.helpers.media.PhotoViewerHelper.gifAsVideo(messageObject)) {
++                        if (desu.inugram.helpers.media.PhotoViewerHelper.gifAsVideo(messageObject)) {
++                            final int durMs = currentAnimation.getDurationMs();
++                            if (durMs > 0) {
++                                seekToProgressPending2 = (float) currentAnimation.getCurrentProgressMs() / durMs;
++                            }
++                        }
+                         object.imageReceiver.setAllowStartAnimation(false);
+                         object.imageReceiver.stopAnimation();
+                         if (MediaController.getInstance().isPlayingMessage(messageObject)) {

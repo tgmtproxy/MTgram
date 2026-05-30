@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 06:49:47 +0300
+Subject: stock incorrectly handles double-taps in RecyclerListView by not checking if the second tap came from the same view, this patch fixes that
+
+---
+ .../main/java/org/telegram/ui/Components/RecyclerListView.java | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerListView.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerListView.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerListView.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerListView.java
+@@ -173,6 +173,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
+ 
+     private GestureDetectorFixDoubleTap gestureDetector;
+     private View currentChildView;
++
+     private int currentChildPosition;
+     private boolean interceptedByChild;
+     private boolean wasPressed;
+@@ -1113,7 +1114,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
+ 
+                 @Override
+                 public boolean onDoubleTap(MotionEvent e) {
+-                    if (doubleTapView != null && onItemClickListenerExtended != null && onItemClickListenerExtended.hasDoubleTap(doubleTapView, currentChildPosition)) {
++                    if (doubleTapView != null && doubleTapView == currentChildView && onItemClickListenerExtended != null && onItemClickListenerExtended.hasDoubleTap(doubleTapView, currentChildPosition)) {
+                         onItemClickListenerExtended.onDoubleTap(doubleTapView, currentChildPosition, e.getX(), e.getY());
+                         doubleTapView = null;
+                         return true;

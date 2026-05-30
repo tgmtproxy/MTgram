@@ -1,0 +1,113 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 17:24:31 +0300
+Subject: customizable sticker size + hide sticker time overlay + remove extra bottom padding from sticker bubbles
+
+---
+ .../telegram/ui/Cells/ChatMessageCell.java    | 29 +++++++++++++++----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Cells/ChatMessageCell.java
+@@ -248,6 +248,7 @@ import java.util.Locale;
+ import java.util.Stack;
+ import java.util.concurrent.atomic.AtomicReference;
+ 
++import desu.inugram.InuConfig;
+ import me.vkryl.android.animator.BoolAnimator;
+ import me.vkryl.android.animator.FactorAnimator;
+ import me.vkryl.core.BitwiseUtils;
+@@ -9502,9 +9503,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                     float maxHeight;
+                     int maxWidth;
+                     if (AndroidUtilities.isTablet()) {
+-                        maxHeight = maxWidth = (int) (AndroidUtilities.getMinTabletSide() * 0.4f);
++                        maxHeight = maxWidth = (int) (AndroidUtilities.getMinTabletSide() * (0.4f + (InuConfig.STICKER_SIZE.getValue() - 14.0f) / 40));
+                     } else {
+-                        maxHeight = maxWidth = (int) (Math.min(getParentWidth(), AndroidUtilities.displaySize.y) * 0.5f);
++                        maxHeight = maxWidth = (int) (Math.min(getParentWidth(), AndroidUtilities.displaySize.y) * (0.5f + (InuConfig.STICKER_SIZE.getValue() - 14.0f) / 30));
+                     }
+                     String filter;
+                     if (messageObject.isAnimatedEmoji() || messageObject.isDice()) {
+@@ -9619,6 +9620,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                     } else {
+                         photoImage.setImage(null, null, thumb, null, messageObject, 0);
+                     }
++                    if (messageObject.useCustomPhoto) {
++                        photoImage.setImageBitmap(getResources().getDrawable(R.drawable.sticker));
++                    }
+                     if (!reactionsLayoutInBubble.isSmall) {
+                         reactionsLayoutInBubble.measure(maxWidth + dp(36), currentMessageObject.isOutOwner() && (currentMessageObject.isAnimatedEmoji() || currentMessageObject.isAnyKindOfSticker()) ? Gravity.RIGHT : Gravity.LEFT);
+                         reactionsLayoutInBubble.drawServiceShaderBackground = 1f;
+@@ -10330,6 +10334,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                     totalHeight += dp(21);
+                     additionalTimeOffsetY = dp(21);
+                 }
++                if (InuConfig.NO_STICKER_EXTRA_PADDING.getValue() && currentMessageObject.isAnyKindOfSticker() && !currentMessageObject.hasReactions()) {
++                    totalHeight -= dp(8);
++                }
+ 
+                 int additionalTop = 0;
+                 if (currentPosition != null && !currentMessageObject.isDocument()) {
+@@ -10790,7 +10797,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+                     totalHeight -= dp(1);
+                 }
+             }
+-            if (messageObject.type != MessageObject.TYPE_EMOJIS) {
++            if (!InuConfig.NO_STICKER_EXTRA_PADDING.getValue() && messageObject.type != MessageObject.TYPE_EMOJIS) {
+                 if (messageObject.isAnyKindOfSticker() && totalHeight < dp(70)) {
+                     additionalTimeOffsetY = dp(70) - totalHeight;
+                     totalHeight += additionalTimeOffsetY;
+@@ -18489,6 +18496,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+         } else {
+             signWidth = 0;
+         }
++        if (messageObject.isAnyKindOfSticker() && InuConfig.STICKER_TIME_MODE.isHideTime()) {
++            timeWidth -= timeTextWidth;
++            timeTextWidth = 0;
++            currentTimeString = "";
++        }
+     }
+ 
+     protected boolean shouldDrawSelectionOverlay() {
+@@ -23450,6 +23462,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+         if (!drawFromPinchToZoom && delegate != null && delegate.getPinchToZoomHelper() != null && delegate.getPinchToZoomHelper().isInOverlayModeFor(this) && shouldDrawTimeOnMedia()) {
+             return;
+         }
++        if (currentMessageObject != null && currentMessageObject.isAnyKindOfSticker() && !isDrawSelectionBackground() && (InuConfig.STICKER_TIME_MODE.isHideFull() || !currentMessageObject.isOut() && InuConfig.STICKER_TIME_MODE.isHideIncoming())) {
++            return;
++        }
+         if (currentMessageObject != null && currentMessageObject.type == MessageObject.TYPE_JOINED_CHANNEL) {
+             return;
+         }
+@@ -23527,6 +23542,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+         if ((!drawTime || groupPhotoInvisible) && shouldDrawTimeOnMedia() || timeLayout == null || (currentMessageObject.deleted && currentPosition != null) || currentMessageObject.type == MessageObject.TYPE_PHONE_CALL) {
+             return;
+         }
++        if (shouldDrawTimeOnMedia() && currentMessageObject.isAnyKindOfSticker() && !currentMessageObject.isOutOwner() && timeWidth <= 0) {
++            return;
++        }
+         if (currentMessageObject.type == MessageObject.TYPE_ROUND_VIDEO) {
+             Theme.chat_timePaint.setColor(
+                 ColorUtils.blendARGB(
+@@ -23628,7 +23646,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+             if (effectId != 0) {
+                 timeX -= dp(14 + 4);
+             }
+-            float x1 = timeX - dp(bigRadius ? 6 : 4);
++            boolean compactStickerTime = currentMessageObject != null && currentMessageObject.isAnyKindOfSticker() && InuConfig.STICKER_TIME_MODE.isHideTime();
++            float x1 = timeX - dp(bigRadius ? 6 : compactStickerTime ? 2 : 4);
+             float offsetX = (currentMessageObject != null && currentMessageObject.isAnyKindOfSticker()) ? dp(2) : 0;
+             float timeY;
+             if (documentAttachType == DOCUMENT_ATTACH_TYPE_ROUND && (currentMessageObject == null || !currentMessageObject.isRoundOnce())) {
+@@ -23638,7 +23657,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
+             }
+             float y1 = timeY - dp(23);
+             float timeHeight = Math.max(dp(17), Theme.chat_timePaint.getTextSize() + dp(5));
+-            rect.set(x1 - offsetX, y1, offsetX + x1 + timeWidth + dp((bigRadius ? 12 : 8) + (currentMessageObject.isOutOwner() ? 20 + (currentMessageObject.type == MessageObject.TYPE_EMOJIS ? 4 : 0) : 0)), y1 + timeHeight);
++            rect.set(x1 - offsetX, y1, offsetX + x1 + timeWidth + dp((bigRadius ? 12 : compactStickerTime ? 4 : 8) + (currentMessageObject.isOutOwner() ? 20 + (currentMessageObject.type == MessageObject.TYPE_EMOJIS ? 4 : 0) : 0)), y1 + timeHeight);
+ 
+             if (groupMedia != null) {
+                 groupMedia.drawBlurRect(canvas, rect, r, .5f * timeAlpha * alpha);

@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 23 Apr 2026 09:25:42 +0300
+Subject: Add a toggle to disable wallpaper parallax (gyro-driven background motion)
+
+---
+ .../org/telegram/ui/Components/SizeNotifierFrameLayout.java     | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/SizeNotifierFrameLayout.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/SizeNotifierFrameLayout.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/SizeNotifierFrameLayout.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/SizeNotifierFrameLayout.java
+@@ -392,7 +392,7 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
+     }
+ 
+     private void checkMotion() {
+-        boolean motion = oldBackgroundMotion || backgroundMotion;
++        boolean motion = (oldBackgroundMotion || backgroundMotion) && !desu.inugram.InuConfig.DISABLE_BG_PARALLAX.getValue();
+         if (motion) {
+             if (parallaxEffect == null) {
+                 parallaxEffect = new WallpaperParallaxEffect(getContext());

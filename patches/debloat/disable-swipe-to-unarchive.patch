@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 10 Apr 2026 03:01:37 +0300
+Subject: disable swipe left gesture to unarchive chats
+
+---
+ .../src/main/java/org/telegram/ui/DialogsActivity.java         | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/DialogsActivity.java
+@@ -2374,6 +2374,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
+             if (waitingForDialogsAnimationEnd(parentPage) || parentLayout != null && parentLayout.isInPreviewMode() || rightSlidingDialogContainer.hasFragment()) {
+                 return 0;
+             }
++            if (folderId == 1 && desu.inugram.InuConfig.DISABLE_SWIPE_TO_UNARCHIVE.getValue()) {
++                return 0;
++            }
+             if (swipingFolder && swipeFolderBack) {
+                 if (viewHolder.itemView instanceof DialogCell) {
+                     ((DialogCell) viewHolder.itemView).swipeCanceled = true;

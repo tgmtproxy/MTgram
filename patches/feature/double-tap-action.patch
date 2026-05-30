@@ -1,0 +1,112 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Thu, 9 Apr 2026 20:16:35 +0300
+Subject: double-tap messages actions
+
+---
+ .../java/org/telegram/ui/ChatActivity.java    | 25 ++++++++++++++++---
+ .../Components/ReactionsContainerLayout.java  |  6 +++++
+ 2 files changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java
+@@ -767,9 +767,9 @@ public class ChatActivity extends BaseFragment implements
+     private AnimatorSet runningAnimation;
+     private int runningAnimationIndex = -1;
+ 
+-    private MessageObject selectedObjectToEditCaption;
+-    private MessageObject selectedObject;
+-    private MessageObject.GroupedMessages selectedObjectGroup;
++    public MessageObject selectedObjectToEditCaption;
++    public MessageObject selectedObject;
++    public MessageObject.GroupedMessages selectedObjectGroup;
+     private boolean forbidForwardingWithDismiss;
+     public MessagePreviewParams messagePreviewParams;
+     public MessageSuggestionParams messageSuggestionParams;
+@@ -1621,6 +1621,10 @@ public class ChatActivity extends BaseFragment implements
+             if (textSelectionHelper.isTryingSelect() || textSelectionHelper.isInSelectionMode() || inPreviewMode || isInsideContainer) {
+                 return false;
+             }
++            if (inu_needExpandReactions) {
++                inu_needExpandReactions = false;
++                return false;
++            }
+             wasManualScroll = true;
+             boolean result = true;
+             boolean showMenu = true;
+@@ -1814,6 +1818,11 @@ public class ChatActivity extends BaseFragment implements
+ 
+         @Override
+         public boolean hasDoubleTap(View view, int position) {
++            if (actionBar.isActionModeShowed()) return false;
++            Boolean hasDoubleTap = desu.inugram.helpers.chat.DoubleTapActionHelper.hasDoubleTap(ChatActivity.this, view);
++            if (hasDoubleTap != null) {
++                return hasDoubleTap;
++            }
+             if (chatMode == MODE_QUICK_REPLIES) return false;
+             String reactionStringSetting = getMediaDataController().getDoubleTapReaction();
+             TLRPC.TL_availableReaction reaction = getMediaDataController().getReactionsMap().get(reactionStringSetting);
+@@ -1840,6 +1849,7 @@ public class ChatActivity extends BaseFragment implements
+ 
+         @Override
+         public void onDoubleTap(View view, int position, float x, float y) {
++            if (desu.inugram.helpers.chat.DoubleTapActionHelper.onDoubleTap(ChatActivity.this, view, x, y)) return;
+             if (getParentActivity() == null || isSecretChat() || isInScheduleMode() || isInPreviewMode() || chatMode == MODE_QUICK_REPLIES) {
+                 return;
+             }
+@@ -30080,6 +30090,12 @@ public class ChatActivity extends BaseFragment implements
+         return createMenu(v, single, listView, x, y, searchGroup, longpress, false);
+     }
+ 
++    private boolean inu_needExpandReactions = false;
++    public boolean inu_createMenuExpanded(View v, float x, float y) {
++        inu_needExpandReactions = true;
++        return createMenu(v, true, false, x, y, true, false, false);
++    }
++
+     @SuppressLint("ClickableViewAccessibility")
+     private boolean createMenu(View v, boolean single, boolean listView, float x, float y, boolean searchGroup, boolean longpress, boolean suggestEdit) {
+         if (actionBar.isActionModeShowed() || isReport()) {
+@@ -31455,6 +31471,7 @@ public class ChatActivity extends BaseFragment implements
+             } else {
+                 final boolean tags = getUserConfig().getClientUserId() == getDialogId();
+                 reactionsLayout = new ReactionsContainerLayout(tags ? ReactionsContainerLayout.TYPE_TAGS : ReactionsContainerLayout.TYPE_DEFAULT, ChatActivity.this, contentView.getContext(), currentAccount, getResourceProvider());
++                reactionsLayout.inu_needExpand = inu_needExpandReactions;
+                 if (tags) {
+                     reactionsLayout.setHint(getUserConfig().isPremium() ? LocaleController.getString(R.string.SavedTagReactionsHint2) : AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.SavedTagReactionsPremiumHint), Theme.key_windowBackgroundWhiteBlueText2, 0, () -> {
+                         closeMenu(false);
+@@ -32641,7 +32658,7 @@ public class ChatActivity extends BaseFragment implements
+         MediaController.saveFile(path, getParentActivity(), messageObject.isVideo() ? 1 : 0, null, null);
+     }
+ 
+-    private void processSelectedOption(int option) {
++    public void processSelectedOption(int option) {
+         if (selectedObject == null || getParentActivity() == null) {
+             return;
+         }
+diff --git a/TMessagesProj/src/main/java/org/telegram/ui/Components/ReactionsContainerLayout.java b/TMessagesProj/src/main/java/org/telegram/ui/Components/ReactionsContainerLayout.java
+index 0000000..0000000 100644
+--- a/TMessagesProj/src/main/java/org/telegram/ui/Components/ReactionsContainerLayout.java
++++ b/TMessagesProj/src/main/java/org/telegram/ui/Components/ReactionsContainerLayout.java
+@@ -235,6 +235,8 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
+     public float bubblesOffset;
+     private float miniBubblesOffset;
+ 
++    public boolean inu_needExpand;
++
+     public ReactionsContainerLayout(int type, BaseFragment fragment, @NonNull Context context, int currentAccount, Theme.ResourcesProvider resourcesProvider) {
+         super(context);
+         this.type = type;
+@@ -2324,6 +2326,10 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
+         if (type == TYPE_MESSAGE_EFFECTS) {
+             NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.availableEffectsUpdate);
+         }
++        if (inu_needExpand) {
++            inu_needExpand = false;
++            post(this::showCustomEmojiReactionDialog);
++        }
+     }
+ 
+     @Override
