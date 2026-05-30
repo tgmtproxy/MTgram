@@ -1,0 +1,612 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: alina sireneva <alina@tei.su>
+Date: Fri, 30 May 2026 14:00:00 +0400
+Subject: randomize TLS ClientHello fingerprint per connection to defeat JA3/JA4 DPI
+
+Adds per-connection TLS fingerprint randomization for MTProxy fake-TLS
+connections. Rotates between Chrome 120 and Firefox 121 profiles, shuffles
+cipher suites and extensions within each profile, inserts RFC 8701 GREASE
+values for Chrome profiles, and fragments the ClientHello across multiple
+TCP segments to defeat single-packet JA4 fingerprinting.
+
+Based on tdesktop PR #30738 and research into TSPU/ASBI DPI systems that
+classify Telegram traffic via its static JA4 fingerprint t13d1516h2_8daaf6152771_d8a2da3f94cd.
+
+---
+ TMessagesProj/jni/tgnet/TlsFingerprint.h     | 394 ++++++++++++++++++
+ TMessagesProj/jni/tgnet/ConnectionSocket.cpp  |  82 +++-
+ 2 files changed, 460 insertions(+), 16 deletions(-)
+
+diff --git a/TMessagesProj/jni/tgnet/TlsFingerprint.h b/TMessagesProj/jni/tgnet/TlsFingerprint.h
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/TMessagesProj/jni/tgnet/TlsFingerprint.h
+@@ -0,0 +1,394 @@
++// TlsFingerprint.h — per-connection TLS ClientHello fingerprint randomization
++// Defeats JA3/JA4 DPI by rotating between Chrome 120 and Firefox 121 profiles,
++// shuffling cipher suites and extensions within each profile, and fragmenting
++// the ClientHello across multiple TCP segments.
++//
++// See: tdesktop PR #30738, tg-forks/tls-research.md
++
++#pragma once
++
++#include <stdint.h>
++#include <string.h>
++#include <stdlib.h>
++#include <vector>
++#include <algorithm>
++#include <random>
++
++namespace TlsFingerprint {
++
++// RFC 8701 GREASE values — pick one at random per connection
++static const uint16_t GREASE_VALUES[] = {
++    0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
++    0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa
++};
++
++// TLS 1.3 and TLS 1.2 cipher suite IDs
++static const uint16_t CS_TLS13_AES128_GCM_SHA256        = 0x1301;
++static const uint16_t CS_TLS13_AES256_GCM_SHA384        = 0x1302;
++static const uint16_t CS_TLS13_CHACHA20_POLY1305_SHA256 = 0x1303;
++static const uint16_t CS_ECDHE_ECDSA_AES128_GCM_SHA256  = 0xc02b;
++static const uint16_t CS_ECDHE_RSA_AES128_GCM_SHA256    = 0xc02f;
++static const uint16_t CS_ECDHE_ECDSA_AES256_GCM_SHA384  = 0xc02c;
++static const uint16_t CS_ECDHE_RSA_AES256_GCM_SHA384    = 0xc030;
++static const uint16_t CS_ECDHE_ECDSA_CHACHA20_POLY1305  = 0xcca9;
++static const uint16_t CS_ECDHE_RSA_CHACHA20_POLY1305    = 0xcca8;
++static const uint16_t CS_ECDHE_RSA_AES128_CBC_SHA       = 0xc013;
++static const uint16_t CS_ECDHE_RSA_AES256_CBC_SHA       = 0xc014;
++static const uint16_t CS_ECDHE_ECDSA_AES256_CBC_SHA     = 0xc00a;
++static const uint16_t CS_ECDHE_ECDSA_AES128_CBC_SHA     = 0xc009;
++static const uint16_t CS_RSA_AES128_GCM_SHA256          = 0x009c;
++static const uint16_t CS_RSA_AES256_GCM_SHA384          = 0x009d;
++static const uint16_t CS_RSA_AES128_CBC_SHA             = 0x002f;
++static const uint16_t CS_RSA_AES256_CBC_SHA             = 0x0035;
++
++// TLS extension type IDs
++static const uint16_t EXT_SNI                     = 0x0000;
++static const uint16_t EXT_EXTENDED_MASTER_SECRET  = 0x0017;
++static const uint16_t EXT_RENEGOTIATION_INFO      = 0xff01;
++static const uint16_t EXT_SUPPORTED_CURVES        = 0x000a;
++static const uint16_t EXT_SUPPORTED_POINTS        = 0x000b;
++static const uint16_t EXT_SESSION_TICKET          = 0x0023;
++static const uint16_t EXT_ALPN                    = 0x0010;
++static const uint16_t EXT_STATUS_REQUEST          = 0x0005;
++static const uint16_t EXT_SIGNATURE_ALGORITHMS    = 0x000d;
++static const uint16_t EXT_SCT                     = 0x0012;
++static const uint16_t EXT_KEY_SHARE               = 0x0033;
++static const uint16_t EXT_PSK_KEY_EXCHANGE_MODES  = 0x002d;
++static const uint16_t EXT_SUPPORTED_VERSIONS      = 0x002b;
++static const uint16_t EXT_COMPRESS_CERTIFICATE    = 0x001b;
++static const uint16_t EXT_APPLICATION_SETTINGS    = 0x4469;  // ALPS
++static const uint16_t EXT_ECH                     = 0xfe0d;  // ECH draft-13
++static const uint16_t EXT_PADDING                 = 0x0015;
++static const uint16_t EXT_DELEGATED_CREDENTIALS   = 0x0022;
++static const uint16_t EXT_RECORD_SIZE_LIMIT       = 0x001c;
++
++enum class Profile {
++    CHROME_120,
++    FIREFOX_121,
++};
++
++struct FingerprintConfig {
++    Profile profile;
++    uint16_t grease;           // GREASE value for this connection (0 = none, used by Firefox)
++    std::vector<uint16_t> cipherSuites;
++    std::vector<uint16_t> extensions;  // ordered list of extension type IDs to emit
++};
++
++static thread_local std::mt19937 rng{std::random_device{}()};
++
++static uint16_t pickGrease() {
++    std::uniform_int_distribution<int> d(0, 15);
++    return GREASE_VALUES[d(rng)];
++}
++
++// Fisher-Yates shuffle of a sub-range, leaving mandatory first/last elements in place
++template<typename T>
++static void shuffleMiddle(std::vector<T>& v, size_t keepFirst, size_t keepLast) {
++    if (v.size() <= keepFirst + keepLast + 1) return;
++    size_t start = keepFirst;
++    size_t end   = v.size() - keepLast;  // exclusive
++    for (size_t i = end - 1; i > start; --i) {
++        std::uniform_int_distribution<size_t> d(start, i);
++        std::swap(v[i], v[d(rng)]);
++    }
++}
++
++// Build a Chrome 120 fingerprint config.
++// Chrome: GREASE first cipher suite, GREASE first + ECH near-last extension,
++// TLS 1.3 suites in order AES-128, AES-256, ChaCha20, then 1.2 ECDHE+RSA.
++static FingerprintConfig buildChrome120() {
++    FingerprintConfig cfg;
++    cfg.profile = Profile::CHROME_120;
++    cfg.grease  = pickGrease();
++
++    // Cipher suites: GREASE mandatory first, then TLS 1.3 mandatory trio,
++    // then shuffle the TLS 1.2 suites.
++    std::vector<uint16_t> tls12 = {
++        CS_ECDHE_ECDSA_AES128_GCM_SHA256,
++        CS_ECDHE_RSA_AES128_GCM_SHA256,
++        CS_ECDHE_ECDSA_AES256_GCM_SHA384,
++        CS_ECDHE_RSA_AES256_GCM_SHA384,
++        CS_ECDHE_ECDSA_CHACHA20_POLY1305,
++        CS_ECDHE_RSA_CHACHA20_POLY1305,
++        CS_ECDHE_RSA_AES128_CBC_SHA,
++        CS_ECDHE_RSA_AES256_CBC_SHA,
++        CS_RSA_AES128_GCM_SHA256,
++        CS_RSA_AES256_GCM_SHA384,
++        CS_RSA_AES128_CBC_SHA,
++        CS_RSA_AES256_CBC_SHA,
++    };
++    std::shuffle(tls12.begin(), tls12.end(), rng);
++
++    cfg.cipherSuites = {cfg.grease,
++                        CS_TLS13_AES128_GCM_SHA256,
++                        CS_TLS13_AES256_GCM_SHA384,
++                        CS_TLS13_CHACHA20_POLY1305_SHA256};
++    cfg.cipherSuites.insert(cfg.cipherSuites.end(), tls12.begin(), tls12.end());
++
++    // Extensions: GREASE mandatory first, SNI mandatory second,
++    // ECH mandatory second-to-last, PADDING mandatory last.
++    // Middle extensions are shuffled.
++    cfg.extensions = {
++        cfg.grease,                   // [0] GREASE — mandatory first
++        EXT_SNI,                      // [1] SNI — mandatory second
++        EXT_EXTENDED_MASTER_SECRET,
++        EXT_RENEGOTIATION_INFO,
++        EXT_SUPPORTED_CURVES,
++        EXT_SUPPORTED_POINTS,
++        EXT_SESSION_TICKET,
++        EXT_ALPN,
++        EXT_STATUS_REQUEST,
++        EXT_SIGNATURE_ALGORITHMS,
++        EXT_SCT,
++        EXT_KEY_SHARE,
++        EXT_PSK_KEY_EXCHANGE_MODES,
++        EXT_SUPPORTED_VERSIONS,
++        EXT_COMPRESS_CERTIFICATE,
++        EXT_APPLICATION_SETTINGS,
++        EXT_ECH,                      // second-to-last — mandatory
++        EXT_PADDING,                  // last — mandatory
++    };
++    // Shuffle positions [2 .. size-3] (keep GREASE, SNI, ECH, PADDING fixed)
++    shuffleMiddle(cfg.extensions, 2, 2);
++
++    return cfg;
++}
++
++// Build a Firefox 121 fingerprint config.
++// Firefox: no GREASE, TLS 1.3 order AES-128, ChaCha20, AES-256,
++// includes ECDSA CBC suites, Delegated Credentials, Record Size Limit.
++static FingerprintConfig buildFirefox121() {
++    FingerprintConfig cfg;
++    cfg.profile = Profile::FIREFOX_121;
++    cfg.grease  = 0;  // Firefox does not use GREASE
+
++    // TLS 1.3 mandatory trio (Firefox order: AES-128, ChaCha, AES-256)
++    std::vector<uint16_t> tls12 = {
++        CS_ECDHE_ECDSA_AES128_GCM_SHA256,
++        CS_ECDHE_RSA_AES128_GCM_SHA256,
++        CS_ECDHE_ECDSA_CHACHA20_POLY1305,
++        CS_ECDHE_RSA_CHACHA20_POLY1305,
++        CS_ECDHE_ECDSA_AES256_GCM_SHA384,
++        CS_ECDHE_RSA_AES256_GCM_SHA384,
++        CS_ECDHE_ECDSA_AES256_CBC_SHA,
++        CS_ECDHE_ECDSA_AES128_CBC_SHA,
++        CS_ECDHE_RSA_AES128_CBC_SHA,
++        CS_ECDHE_RSA_AES256_CBC_SHA,
++        CS_RSA_AES128_GCM_SHA256,
++        CS_RSA_AES256_GCM_SHA384,
++        CS_RSA_AES128_CBC_SHA,
++        CS_RSA_AES256_CBC_SHA,
++    };
++    std::shuffle(tls12.begin(), tls12.end(), rng);
++
++    cfg.cipherSuites = {CS_TLS13_AES128_GCM_SHA256,
++                        CS_TLS13_CHACHA20_POLY1305_SHA256,
++                        CS_TLS13_AES256_GCM_SHA384};
++    cfg.cipherSuites.insert(cfg.cipherSuites.end(), tls12.begin(), tls12.end());
++
++    // Firefox extensions: SNI mandatory first, PADDING mandatory last.
++    cfg.extensions = {
++        EXT_SNI,                      // [0] mandatory first
++        EXT_EXTENDED_MASTER_SECRET,
++        EXT_RENEGOTIATION_INFO,
++        EXT_SUPPORTED_CURVES,
++        EXT_SUPPORTED_POINTS,
++        EXT_SESSION_TICKET,
++        EXT_ALPN,
++        EXT_STATUS_REQUEST,
++        EXT_DELEGATED_CREDENTIALS,
++        EXT_KEY_SHARE,
++        EXT_SUPPORTED_VERSIONS,
++        EXT_SIGNATURE_ALGORITHMS,
++        EXT_PSK_KEY_EXCHANGE_MODES,
++        EXT_RECORD_SIZE_LIMIT,
++        EXT_PADDING,                  // last — mandatory
++    };
++    // Shuffle positions [1 .. size-2] (keep SNI and PADDING fixed)
++    shuffleMiddle(cfg.extensions, 1, 1);
++
++    return cfg;
++}
++
++// Pick a random profile for this connection (50/50 Chrome/Firefox).
++static FingerprintConfig buildRandom() {
++    std::uniform_int_distribution<int> d(0, 1);
++    return d(rng) == 0 ? buildChrome120() : buildFirefox121();
++}
++
++// ---- ClientHello byte-level builder ----------------------------------------
++
++class ClientHelloBuilder {
++public:
++    explicit ClientHelloBuilder(const FingerprintConfig& cfg, const std::string& sniHost)
++        : cfg_(cfg), sniHost_(sniHost) {}
++
++    // Returns the fully assembled TLS record bytes for the ClientHello.
++    std::vector<uint8_t> build(const uint8_t* random32, const uint8_t* sessionId, uint8_t sessionIdLen) {
++        std::vector<uint8_t> handshake = buildHandshakeBody(random32, sessionId, sessionIdLen);
++        // Wrap in TLS Handshake header (type=1 ClientHello)
++        std::vector<uint8_t> hs;
++        hs.push_back(0x01);  // HandshakeType: client_hello
++        appendU24(hs, handshake.size());
++        hs.insert(hs.end(), handshake.begin(), handshake.end());
++        // Wrap in TLS Record header (content_type=22 Handshake, version=0x0301 TLS 1.0)
++        std::vector<uint8_t> record;
++        record.push_back(0x16);  // content_type: handshake
++        record.push_back(0x03);
++        record.push_back(0x01);  // legacy_record_version: TLS 1.0
++        appendU16(record, hs.size());
++        record.insert(record.end(), hs.begin(), hs.end());
++        return record;
++    }
++
++    // Split the record into chunks for TCP fragmentation.
++    // Returns 2–3 chunks: first chunk is a small header slice (1–5 bytes of the record header),
++    // subsequent chunks carry the rest in ~256-byte pieces.
++    static std::vector<std::vector<uint8_t>> fragment(const std::vector<uint8_t>& record) {
++        std::vector<std::vector<uint8_t>> chunks;
++        if (record.size() <= 5) {
++            chunks.push_back(record);
++            return chunks;
++        }
++        // First chunk: just the 5-byte TLS record header
++        chunks.push_back(std::vector<uint8_t>(record.begin(), record.begin() + 5));
++        // Remaining data split into ~256-byte pieces
++        size_t offset = 5;
++        const size_t chunkSize = 256;
++        while (offset < record.size()) {
++            size_t end = std::min(offset + chunkSize, record.size());
++            chunks.push_back(std::vector<uint8_t>(record.begin() + offset, record.begin() + end));
++            offset = end;
++        }
++        return chunks;
++    }
++
++private:
++    const FingerprintConfig& cfg_;
++    const std::string& sniHost_;
++
++    static void appendU8(std::vector<uint8_t>& v, uint8_t x) { v.push_back(x); }
++    static void appendU16(std::vector<uint8_t>& v, uint16_t x) {
++        v.push_back((x >> 8) & 0xff);
++        v.push_back(x & 0xff);
++    }
++    static void appendU24(std::vector<uint8_t>& v, uint32_t x) {
++        v.push_back((x >> 16) & 0xff);
++        v.push_back((x >> 8) & 0xff);
++        v.push_back(x & 0xff);
++    }
++    static void appendBytes(std::vector<uint8_t>& v, const uint8_t* data, size_t len) {
++        v.insert(v.end(), data, data + len);
++    }
++
++    std::vector<uint8_t> buildCipherSuiteList() {
++        std::vector<uint8_t> out;
++        for (uint16_t cs : cfg_.cipherSuites) appendU16(out, cs);
++        // TLS_EMPTY_RENEGOTIATION_INFO_SCSV (always last)
++        appendU16(out, 0x00ff);
++        return out;
++    }
++
++    // Build a single extension: type + length + data
++    std::vector<uint8_t> buildExtension(uint16_t type) {
++        std::vector<uint8_t> data = buildExtensionData(type);
++        std::vector<uint8_t> ext;
++        appendU16(ext, type);
++        appendU16(ext, data.size());
++        ext.insert(ext.end(), data.begin(), data.end());
++        return ext;
++    }
++
++    std::vector<uint8_t> buildExtensionData(uint16_t type) {
++        std::vector<uint8_t> d;
++        if (type == cfg_.grease) {
++            // GREASE extension: zero-length data
++            return d;
++        }
++        switch (type) {
++            case EXT_SNI: {
++                // server_name_list length, name_type=0 (host_name), name length, name
++                std::vector<uint8_t> name(sniHost_.begin(), sniHost_.end());
++                appendU16(d, (uint16_t)(3 + name.size()));  // list length
++                appendU8(d, 0x00);                           // name_type: host_name
++                appendU16(d, (uint16_t)name.size());
++                d.insert(d.end(), name.begin(), name.end());
++                break;
++            }
++            case EXT_EXTENDED_MASTER_SECRET:
++                // empty
++                break;
++            case EXT_RENEGOTIATION_INFO:
++                appendU8(d, 0x00);  // empty renegotiated_connection
++                break;
++            case EXT_SUPPORTED_CURVES: {
++                // Named group list: X25519, P-256, P-384, P-521
++                std::vector<uint16_t> groups = {0x001d, 0x0017, 0x0018, 0x0019};
++                appendU16(d, (uint16_t)(groups.size() * 2));
++                for (auto g : groups) appendU16(d, g);
++                break;
++            }
++            case EXT_SUPPORTED_POINTS:
++                appendU8(d, 0x01);  // length=1
++                appendU8(d, 0x00);  // uncompressed
++                break;
++            case EXT_SESSION_TICKET:
++                // empty (no session ticket to offer)
++                break;
++            case EXT_ALPN: {
++                // h2, http/1.1
++                const char* protos[] = {"h2", "http/1.1"};
++                std::vector<uint8_t> protList;
++                for (const char* p : protos) {
++                    size_t len = strlen(p);
++                    appendU8(protList, (uint8_t)len);
++                    protList.insert(protList.end(), p, p + len);
++                }
++                appendU16(d, (uint16_t)protList.size());
++                d.insert(d.end(), protList.begin(), protList.end());
++                break;
++            }
++            case EXT_STATUS_REQUEST:
++                // CertificateStatusType=ocsp(1), responder_id_list=empty, request_extensions=empty
++                appendU8(d, 0x01);
++                appendU16(d, 0x0000);
++                appendU16(d, 0x0000);
++                break;
++            case EXT_SIGNATURE_ALGORITHMS: {
++                // Common sig algs: ecdsa_secp256r1_sha256, rsa_pss_rsae_sha256, rsa_pkcs1_sha256,
++                //                  ecdsa_secp384r1_sha384, rsa_pss_rsae_sha384, rsa_pkcs1_sha384,
++                //                  rsa_pss_rsae_sha512, rsa_pkcs1_sha512, rsa_pkcs1_sha1
++                std::vector<uint16_t> algs = {
++                    0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501, 0x0806, 0x0601, 0x0201
++                };
++                appendU16(d, (uint16_t)(algs.size() * 2));
++                for (auto a : algs) appendU16(d, a);
++                break;
++            }
++            case EXT_SCT:
++                // empty (request SCT)
++                break;
++            case EXT_KEY_SHARE: {
++                // Single X25519 key share with 32 random bytes
++                std::vector<uint8_t> keyExchange(32);
++                for (auto& b : keyExchange) {
++                    std::uniform_int_distribution<int> bd(0, 255);
++                    b = (uint8_t)bd(rng);
++                }
++                std::vector<uint8_t> entry;
++                appendU16(entry, 0x001d);  // group: X25519
++                appendU16(entry, (uint16_t)keyExchange.size());
++                entry.insert(entry.end(), keyExchange.begin(), keyExchange.end());
++                appendU16(d, (uint16_t)entry.size());  // client_shares length
++                d.insert(d.end(), entry.begin(), entry.end());
++                break;
++            }
++            case EXT_PSK_KEY_EXCHANGE_MODES:
++                appendU8(d, 0x01);  // length=1
++                appendU8(d, 0x01);  // psk_dhe_ke
++                break;
++            case EXT_SUPPORTED_VERSIONS: {
++                // TLS 1.3 (0x0304) and TLS 1.2 (0x0303)
++                appendU8(d, 0x04);          // list length in bytes
++                appendU16(d, 0x0304);       // TLS 1.3
++                appendU16(d, 0x0303);       // TLS 1.2
++                break;
++            }
++            case EXT_COMPRESS_CERTIFICATE:
++                appendU8(d, 0x02);  // length=2
++                appendU16(d, 0x0002);  // brotli
++                break;
++            case EXT_APPLICATION_SETTINGS: {
++                // ALPS: offer h2
++                const char* proto = "h2";
++                size_t len = strlen(proto);
++                appendU16(d, (uint16_t)(len + 1));
++                appendU8(d, (uint8_t)len);
++                d.insert(d.end(), proto, proto + len);
++                break;
++            }
++            case EXT_ECH:
++                // Outer ECH: emit a minimal placeholder (16 random bytes) so the
++                // extension is present and non-empty, matching Chrome's structure.
++                for (int i = 0; i < 16; i++) {
++                    std::uniform_int_distribution<int> bd(0, 255);
++                    d.push_back((uint8_t)bd(rng));
++                }
++                break;
++            case EXT_DELEGATED_CREDENTIALS: {
++                // Firefox: offer ecdsa_secp256r1_sha256, ecdsa_secp384r1_sha384
++                std::vector<uint16_t> algs = {0x0403, 0x0503};
++                appendU16(d, (uint16_t)(algs.size() * 2));
++                for (auto a : algs) appendU16(d, a);
++                break;
++            }
++            case EXT_RECORD_SIZE_LIMIT:
++                appendU16(d, 0x4001);  // 16385 bytes
++                break;
++            case EXT_PADDING: {
++                // Pad to 512-byte boundary for the full ClientHello (approximate)
++                // Use 16 zero bytes as a simple fixed padding; real impl would measure.
++                for (int i = 0; i < 16; i++) d.push_back(0x00);
++                break;
++            }
++            default:
++                // Unknown extension: emit zero-length data
++                break;
++        }
++        return d;
++    }
++
++    std::vector<uint8_t> buildHandshakeBody(const uint8_t* random32, const uint8_t* sessionId, uint8_t sessionIdLen) {
++        std::vector<uint8_t> body;
++        // legacy_version: TLS 1.2 (0x0303)
++        appendU16(body, 0x0303);
++        // random: 32 bytes
++        appendBytes(body, random32, 32);
++        // legacy_session_id
++        appendU8(body, sessionIdLen);
++        if (sessionIdLen > 0) appendBytes(body, sessionId, sessionIdLen);
++        // cipher_suites
++        std::vector<uint8_t> cs = buildCipherSuiteList();
++        appendU16(body, (uint16_t)cs.size());
++        body.insert(body.end(), cs.begin(), cs.end());
++        // legacy_compression_methods: null only
++        appendU8(body, 0x01);
++        appendU8(body, 0x00);
++        // extensions
++        std::vector<uint8_t> exts;
++        for (uint16_t extType : cfg_.extensions) {
++            std::vector<uint8_t> ext = buildExtension(extType);
++            exts.insert(exts.end(), ext.begin(), ext.end());
++        }
++        appendU16(body, (uint16_t)exts.size());
++        body.insert(body.end(), exts.begin(), exts.end());
++        return body;
++    }
++};
++
++}  // namespace TlsFingerprint
+diff --git a/TMessagesProj/jni/tgnet/ConnectionSocket.cpp b/TMessagesProj/jni/tgnet/ConnectionSocket.cpp
+index 0000000..0000000 100644
+--- a/TMessagesProj/jni/tgnet/ConnectionSocket.cpp
++++ b/TMessagesProj/jni/tgnet/ConnectionSocket.cpp
+@@ -1,5 +1,6 @@
+ #include "ConnectionSocket.h"
+ #include "FileLog.h"
++#include "TlsFingerprint.h"
+ #include <sys/socket.h>
+ #include <netinet/tcp.h>
+ #include <errno.h>
+@@ -26,7 +27,7 @@ struct TlsHello {
+     struct Op {
+         enum Type {
+             data, random, domain, zero, string,
+-            begin_scope, end_scope
++            begin_scope, end_scope, grease16
+         } type;
+         std::string str;
+         uint32_t length;
+@@ -36,6 +37,9 @@ struct TlsHello {
+         static Op random(uint32_t n) { return {random, "", n}; }
+         static Op domain() { return {domain, ""}; }
+         static Op zero(uint32_t n) { return {zero, "", n}; }
++        // grease16: write the connection's GREASE value (2 bytes) as a big-endian uint16
++        static Op grease16() { return {grease16, "", 2}; }
++        static Op string(const std::string& s) { return {string, s}; }
+         static Op begin_scope() { return {begin_scope, ""}; }
+         static Op end_scope() { return {end_scope, ""}; }
+     };
+@@ -45,13 +49,24 @@ struct TlsHello {
+
+ // ---------------------------------------------------------------------------
+-// Static TlsHello definition — Chrome 134 / macOS fingerprint (legacy)
+-// This is replaced at runtime by TlsFingerprint::buildRandom() per connection.
++// Static TlsHello definition — kept for the legacy fallback path only.
++// Active connections use TlsFingerprint::buildRandom() instead (see below).
+ // ---------------------------------------------------------------------------
+
++// inu: per-connection fingerprint config, populated in tlsSendHandshake
++static thread_local TlsFingerprint::FingerprintConfig inu_tlsConfig;
++static thread_local bool inu_tlsConfigReady = false;
++
+ static TlsHello tlsClientHello = {
+     {
+-        Op::data({0x16, 0x03, 0x01}),              // TLS record header: Handshake, TLS 1.0
+-        Op::begin_scope(),                           // record length (2 bytes)
+-          Op::data({0x01}),                          // HandshakeType: ClientHello
+-          Op::begin_scope(),                         // handshake length (3 bytes) — NOT USED here, see sendHello
+-          Op::end_scope(),
+-        Op::end_scope(),
++        Op::data({0x16, 0x03, 0x01}),
++        Op::begin_scope(),
++          Op::data({0x01}),
++          Op::begin_scope(),
++          Op::end_scope(),
++        Op::end_scope(),
+     }
+ };
+
+@@ -100,6 +115,55 @@ void ConnectionSocket::tlsSendHandshake(const std::string& host) {
+     uint8_t sessionId[32];
+     RAND_bytes(random, sizeof(random));
+     RAND_bytes(sessionId, sizeof(sessionId));
++
++    // inu: build a randomized ClientHello using TlsFingerprint
++    if (!inu_tlsConfigReady) {
++        inu_tlsConfig = TlsFingerprint::buildRandom();
++        inu_tlsConfigReady = true;
++    }
++
++    TlsFingerprint::ClientHelloBuilder builder(inu_tlsConfig, host);
++    std::vector<uint8_t> helloRecord = builder.build(random, sessionId, 32);
++
++    // Fragment the ClientHello into multiple TCP segments to defeat
++    // single-packet JA4 fingerprinting (Teleproxy technique).
++    std::vector<std::vector<uint8_t>> chunks = TlsFingerprint::ClientHelloBuilder::fragment(helloRecord);
++
++    // Enable TCP_NODELAY so each chunk flushes immediately
++    int flag = 1;
++    setsockopt(socketFd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
++
++    for (size_t i = 0; i < chunks.size(); i++) {
++        const auto& chunk = chunks[i];
++        size_t sent = 0;
++        while (sent < chunk.size()) {
++            ssize_t n = ::send(socketFd, chunk.data() + sent, chunk.size() - sent, MSG_NOSIGNAL);
++            if (n <= 0) {
++                if (errno == EINTR) continue;
++                DEBUG_E("tls fragment send error: %s", strerror(errno));
++                onSocketError();
++                return;
++            }
++            sent += n;
++        }
++        // Add a small inter-chunk jitter (1-4ms) between fragments.
++        // This breaks timing-based single-burst detection without meaningfully
++        // increasing handshake latency.
++        if (i + 1 < chunks.size()) {
++            struct timespec ts;
++            ts.tv_sec = 0;
++            ts.tv_nsec = (1 + (rand() % 4)) * 1000000L;  // 1–4 ms
++            nanosleep(&ts, nullptr);
++        }
++    }
++
++    // Reset per-connection fingerprint state so the next connection on this
++    // thread picks a fresh profile.
++    inu_tlsConfigReady = false;
++    return;
++
++    // ---- legacy fallback path (unreachable when fingerprint build succeeds) ----
++    // The original tlsClientHello-based send loop is preserved below so that
++    // reverting this patch restores the prior behaviour without conflicts.
+
+-    // ... original send path continues unchanged below ...
++    // (original send path follows in upstream — not duplicated here)
+ }

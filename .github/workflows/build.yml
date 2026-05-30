@@ -28,6 +28,7 @@ concurrency:
 permissions: {}
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ARTIFACT_NAME: ${{ inputs.artifact-name || format('mtgram-build-{0}', github.run_id) }}
 
 jobs:
@@ -75,6 +76,7 @@ jobs:
           java-version: 21
 
       - name: set up ccache
+
         uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2
         with:
           append-timestamp: false
@@ -109,6 +111,7 @@ jobs:
         env:
           MTG_BUILD: ${{ vars.MTG_BUILD || '1' }}
         run: pnpm tsx scripts/ci/version.ts
+
 
       - uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v4
         with:
