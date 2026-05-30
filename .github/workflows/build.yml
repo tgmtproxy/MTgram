@@ -32,7 +32,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fast]
     timeout-minutes: 180
     outputs:
       apk-name: ${{ steps.info.outputs.apk-name }}
